@@ -62,7 +62,7 @@ details = {
     'checks': ['Strict app signature verified', 'DMG checksum valid'],
     'first_launch': 'macOS normally blocks a downloaded unnotarized app; per-app Open Anyway approval may be available',
     'downloaded_installation_verified': False,
-    'live_updates': 'Not configured; replace beta manually',
+    'live_updates': info.get('SUFeedURL', 'Not configured; replace beta manually'),
 }
 (dmg.parent / 'package-details.json').write_text(json.dumps(details, indent=2) + '\n')
 print(json.dumps({k: details[k] for k in ['version', 'dmg_bytes', 'zip_bytes', 'app_logical_bytes']}, indent=2))

@@ -463,7 +463,6 @@ struct MixerView: View {
     private var appControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                sectionTitle("APPS")
                 Spacer()
                 Text("\(apps.count) \(apps.count == 1 ? "app" : "apps")")
                     .font(.system(size: 11)).foregroundStyle(palette.secondary)

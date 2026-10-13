@@ -1,6 +1,6 @@
 # Zero-budget Levels beta
 
-The first downloadable beta is 0.1.3/build 4, Apple silicon, macOS 15+. It uses the verified optimized Release app, free ad-hoc signing, and no Apple notarization. Publishing this beta does not require paid Apple Developer membership. Self-signed or Sparkle update signatures do not create Gatekeeper trust.
+The first downloadable beta is 0.1.4/build 5, Apple silicon, macOS 15+. It uses the verified optimized Release app, free ad-hoc signing, and no Apple notarization. Publishing this beta does not require paid Apple Developer membership. Self-signed or Sparkle update signatures do not create Gatekeeper trust.
 
 ## Build and package
 
@@ -10,11 +10,11 @@ The output in dist/Beta contains the drag-to-Applications DMG, app-only ZIP, SHA
 
 ## Published release
 
-The updated sample is prepared as v0.1.3-beta. Publish its verified DMG, ZIP, and checksums at https://github.com/madetonight/Levels/releases/tag/v0.1.3-beta. No signing key or credential belongs in the repository.
+The updated sample is prepared as v0.1.4-beta. Publish its verified DMG, ZIP, and checksums at https://github.com/madetonight/Levels/releases/tag/v0.1.4-beta. No signing key or credential belongs in the repository.
 
 For subsequent releases:
 
-Use the public `madetonight/Levels` repository. Create a GitHub release tagged `v0.1.3-beta`, title `Levels 0.1.3 beta`, and mark it as a pre-release. Use dist/Beta/RELEASE-NOTES.md for the description. Upload the DMG, optional ZIP, and SHA256SUMS.txt. Publishing binaries does not require uploading local source or developer credentials. Keep the beta label and unnotarized-install notice visible next to the download.
+Use the public `madetonight/Levels` repository. Create a GitHub release tagged `v0.1.4-beta`, title `Levels 0.1.4 beta`, and mark it as a pre-release. Use dist/Beta/RELEASE-NOTES.md for the description. Upload the DMG, optional ZIP, and SHA256SUMS.txt. Publishing binaries does not require uploading local source or developer credentials. Keep the beta label and unnotarized-install notice visible next to the download.
 
 ## Verify a fresh installation
 
@@ -24,6 +24,4 @@ Test first launch, menu-bar icon, audio permission, saved volume/mute, independe
 
 ## Updates
 
-No live feed is published for this beta. The existing update settings are present but report that updates are unavailable. Sparkle archive signing is separate from Apple signing and can be used without buying a Developer ID certificate; private-key access and real installation tests still need completion. Do not advertise automatic updates until verified.
-
-References: https://support.apple.com/102445 and https://sparkle-project.org/documentation/
+The connected beta uses https://madetonight.github.io/Levels/appcast.xml. Earlier releases through 0.1.3 need manual installation of this build first. Updates are then checked inside Levels; daily checking is opt-in and installation requires approval. Sparkle archive signatures are free and separate from Apple signing. See UPDATES.md for publishing and verification steps.

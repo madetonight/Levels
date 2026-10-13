@@ -30,6 +30,8 @@
 	<string>Levels detects your paired Bluetooth audio devices.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Audio engine © 2026 pantafive, MIT license. Levels interface © 2026 Jose Luna.</string>
+	<key>SUFeedURL</key>
+	<string>https://madetonight.github.io/Levels/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>mCJAMbMGOi5TJyPgujj4BcpkQLOfsqGgW0vvkpKzrvg=</string>
 	<key>SUEnableAutomaticChecks</key>
