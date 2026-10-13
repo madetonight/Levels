@@ -1,0 +1,8 @@
+build/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+Vendor/SourcePackages/
+dist/
+.publish-repository/
+Design/
