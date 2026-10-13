@@ -1,4 +1,4 @@
-# Levels 0.1.4 beta
+# Levels 0.1.5 beta
 
 A compact macOS menu-bar mixer for per-app volume, mute, and separate audio outputs.
 
@@ -6,12 +6,13 @@ A compact macOS menu-bar mixer for per-app volume, mute, and separate audio outp
 
 ## Download and install
 
-Download `Levels-0.1.4-beta-arm64.dmg`, open it, and drag Levels to Applications. Quit any previous copy before replacing it. Eject the image and launch Levels from Applications. It lives in the menu bar; no main window opens automatically.
+Download `Levels-0.1.5-beta-arm64.dmg`, open it, and drag Levels to Applications. Quit any previous copy before replacing it. Eject the image and launch Levels from Applications. It lives in the menu bar; no main window opens automatically.
 
 **This beta is not Apple-notarized.** It uses a free ad-hoc signature, so macOS normally blocks the first launch of an internet download. If you trust the download, follow [Apple's instructions](https://support.apple.com/102445): attempt to open Levels, then visit System Settings → Privacy & Security → Open Anyway and confirm. Approval may be restricted on managed Macs.
 
 ## Changes in this sample
 
+- Fixed the packaged ad-hoc beta failing to load its Sparkle framework at launch.
 - Connected in-app update checks to the public Levels update feed.
 - Optional daily checks; each installation requires your approval.
 - Removed the Apps section heading for a cleaner Output panel.
@@ -32,7 +33,7 @@ macOS System Audio Recording permission is needed for per-app control. Audio is 
 
 Sleep/wake recovery and external-device reconnection still need broader testing. Multiple-output playback and independent controls were verified on the development Mac; compatibility on other Macs and a fresh browser-downloaded installation remain unverified.
 
-Install this first connected beta manually if you have 0.1.3 or earlier. Future releases appear in Options → Updates → Check for Updates. Enable Automatically check for updates for daily checks. Levels asks before installing; update archives are verified with its dedicated signing key. No purchase activation or subscription is required.
+Install this first connected beta manually if you have 0.1.4 or earlier. Future releases appear in Options → Updates → Check for Updates. Enable Automatically check for updates for daily checks. Levels asks before installing; update archives are verified with its dedicated signing key. No purchase activation or subscription is required.
 
 Report bugs at https://github.com/madetonight/Levels/issues with your macOS version, Mac model, audio devices, and steps to reproduce. For sleep bugs, include whether quitting Levels restores audio. Do not attach private audio recordings.
 

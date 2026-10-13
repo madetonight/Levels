@@ -1,4 +1,4 @@
-LEVELS 0.1.4 — PUBLIC BETA (NOT NOTARIZED)
+LEVELS 0.1.5 — PUBLIC BETA (NOT NOTARIZED)
 
 A menu-bar volume mixer for your Mac.
 
@@ -45,7 +45,7 @@ Sleep/wake and external-device reconnection still need broader live testing.
 This build has no purchase activation or license-key validation. Options →
 Updates offers a manual update check and a remembered automatic-check setting.
 The public update feed is https://madetonight.github.io/Levels/appcast.xml.
-Install this beta manually if upgrading from 0.1.3 or earlier. Future versions
+Install this beta manually if upgrading from 0.1.4 or earlier. Future versions
 can be installed inside Levels using Options → Updates → Check for Updates.
 Enable Automatically check for updates for daily checks. Levels verifies each
 update archive and asks before installation; it never installs silently.
