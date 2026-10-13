@@ -29,7 +29,16 @@ enum RenderHarness {
         appearanceChoices.performActionForItem(at: darkIndex)
         precondition(appearanceChoices.items.map(\.title) == ["Dark", "Light", "", "Solid", "Liquid Glass"])
         precondition(appearanceChoices.items[2].isSeparatorItem)
-        precondition(firstMenu.items.allSatisfy { $0.title != "Surface" && $0.title != "Show inactive audio apps" })
+        precondition(firstMenu.items.allSatisfy { $0.title != "Surface" })
+        let inactiveIndex = firstMenu.items.firstIndex { $0.title == "Show inactive audio apps" }!
+        precondition(!checkOptions.showIdleApps && firstMenu.items[inactiveIndex].state == .off)
+        firstMenu.performActionForItem(at: inactiveIndex)
+        precondition(checkOptions.showIdleApps && checkDefaults.bool(forKey: "LevelsShowInactiveAudioApps"))
+        let restoredOptions = MixerOptions(engine: engine, defaults: checkDefaults)
+        precondition(restoredOptions.showIdleApps)
+        let toggledMenu = checkOptions.makeMenu()
+        toggledMenu.performActionForItem(at: toggledMenu.items.firstIndex { $0.title == "Show inactive audio apps" }!)
+        precondition(!checkOptions.showIdleApps)
         let surfaceChoices = appearanceChoices
         surfaceChoices.performActionForItem(at: surfaceChoices.items.firstIndex { $0.title == "Liquid Glass" }!)
         let secondMenu = checkOptions.makeMenu()

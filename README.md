@@ -4,15 +4,15 @@ A native macOS menu bar volume mixer. Its audio engine is adapted from [Fader](h
 
 ## Try it
 
-Source, assets, tests, scripts, documentation, and distributable builds are maintained in this project. Download the [latest sample beta](https://github.com/madetonight/Levels/releases/tag/v0.1.2-beta), or build locally with the scripts below.
+Source, assets, tests, scripts, documentation, and distributable builds are maintained in this project. Download the [latest sample beta](https://github.com/madetonight/Levels/releases/tag/v0.1.3-beta), or build locally with the scripts below.
 
 Open `dist/Levels.app`. Left-click the three-fader icon in the menu bar to open the panel. Right-click that icon, or click the panel's top-right three-dot Options button, for the same appearance, surface, settings, and Quit menu.
 
 Levels stays in the menu bar. Launching or reopening the app does not open a window or activate a hidden item. Reveal it through your menu bar manager, then click its icon to open the mixer. On macOS 27 it uses AppKit's expanded-interface lifecycle; earlier systems use the classic button action. Keyboard navigation uses native controls.
 
-- **Output:** master volume, per-app volume/mute, and per-app output selectors are together here. Click the device name under Master Volume to change the Mac's default output. System default in an app's selector follows that device. Known audio apps remain visible when silent and are labeled Idle; their levels and output choices persist across launches.
+- **Output:** master volume, per-app volume/mute, and per-app output selectors are together here. Click the device name under Master Volume to change the Mac's default output. System default in an app's selector follows that device. Neutral idle apps are hidden by default; apps with adjusted volume, mute, or routing remain visible with their saved settings. Show inactive audio apps restores the full known list.
 - **Input:** select an input and adjust gain when supported by the hardware. Shows which apps are using the microphone.
-- **Settings:** choose Dark or Light followed by Solid or Liquid Glass in Appearance; optionally launch at login, reset app volumes, or quit. Right-click an app row to reset only that app.
+- **Settings:** choose Dark or Light followed by Solid or Liquid Glass in Appearance; optionally launch at login, show inactive audio apps, reset app volumes, or quit. Right-click an app row to reset only that app.
 
 The compact 320 × 560-point mixer uses the approved sage and mint palette and real icons from each running app. The top-right three-dot Options button opens settings. Appearance offers Solid (the opaque textured background) and Liquid Glass (clear native glass on macOS 26+); the Output/Input bar follows the same surface choice. Dark/Light color and Solid/Liquid Glass material are independently selectable in one submenu. Existing System preferences continue following macOS until a color is chosen. The interface uses the default San Francisco system font. The reflective border applies to both surfaces. Reduced Transparency uses a solid background; earlier systems use a translucent material fallback for glass.
 
@@ -61,11 +61,11 @@ To build the optimized Apple silicon release and its drag-to-Applications disk i
 ./Scripts/package-dmg.sh
 ```
 
-This preserves the regular development build, places the optimized app and ZIP in `dist/Release/`, and creates `dist/Levels-0.1.2-arm64.dmg`. The image includes the app, an Applications shortcut, install/privacy notes, and MIT attribution. This package has an ad-hoc signature: it has no Developer ID distribution signature or Apple notarization and fails Gatekeeper's public-distribution assessment. Do not describe it as a notarized public installer. Package measurements and verification results are in `dist/Release/package-details.json`.
+This preserves the regular development build, places the optimized app and ZIP in `dist/Release/`, and creates `dist/Levels-0.1.3-arm64.dmg`. The image includes the app, an Applications shortcut, install/privacy notes, and MIT attribution. This package has an ad-hoc signature: it has no Developer ID distribution signature or Apple notarization and fails Gatekeeper's public-distribution assessment. Do not describe it as a notarized public installer. Package measurements and verification results are in `dist/Release/package-details.json`.
 
 ## Downloadable beta
 
-[Download Levels 0.1.2 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.2-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
+[Download Levels 0.1.3 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.3-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
 
 Run `Scripts/package-beta.sh` to package the existing optimized app in `dist/Release/Levels.app` as a clearly labeled, unnotarized beta. After source changes, rebuild with `Scripts/package-dmg.sh` first. The beta DMG, app-only ZIP, portable checksums, release notes, and package measurements are kept in `dist/Beta/`. See BETA.md for publishing and installation validation.
 

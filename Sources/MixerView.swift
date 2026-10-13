@@ -42,6 +42,9 @@ final class MixerOptions: NSObject {
     fileprivate var surface: MixerSurface {
         didSet { defaults.set(surface.rawValue, forKey: "LevelsMixerSurface") }
     }
+    var showIdleApps: Bool {
+        didSet { defaults.set(showIdleApps, forKey: "LevelsShowInactiveAudioApps") }
+    }
     var settingsError: String?
 
     init(engine: MixerEngine, defaults: UserDefaults = .standard) {
@@ -50,6 +53,7 @@ final class MixerOptions: NSObject {
         updates = AppUpdateController(defaults: defaults)
         appearance = MixerAppearance(rawValue: defaults.string(forKey: "LevelsMixerAppearance") ?? "") ?? .system
         surface = MixerSurface(rawValue: defaults.string(forKey: "LevelsMixerSurface") ?? "") ?? .mesh
+        showIdleApps = defaults.bool(forKey: "LevelsShowInactiveAudioApps")
         super.init()
     }
 
@@ -75,6 +79,7 @@ final class MixerOptions: NSObject {
         appearanceItem.submenu = appearances
         menu.addItem(.separator())
         add("Launch at login", to: menu, action: #selector(toggleLogin), checked: SMAppService.mainApp.status == .enabled)
+        add("Show inactive audio apps", to: menu, action: #selector(toggleInactiveApps), checked: showIdleApps)
         menu.addItem(.separator())
         add("Reset all app volumes…", to: menu, action: #selector(confirmReset))
         let updatesMenu = NSMenu(title: "Updates")
@@ -113,6 +118,7 @@ final class MixerOptions: NSObject {
         surface = choice
     }
 
+    @objc private func toggleInactiveApps() { showIdleApps.toggle() }
     @objc private func checkForUpdates() { updates.checkForUpdates() }
     @objc private func toggleAutomaticUpdates() { updates.setAutomaticChecks(!updates.automaticallyChecks) }
 
@@ -139,7 +145,7 @@ final class MixerOptions: NSObject {
         let alert = NSAlert()
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         alert.messageText = version.isEmpty ? "Levels" : "Levels · \(version)"
-        alert.informativeText = "An open-source audio engine volume mixer designed for you.\n\nBuilt by Hey José Luna.\nInspired by Ahmed Gagan.\n\nAudio is processed locally and is never saved or uploaded."
+        alert.informativeText = "An open-source audio engine volume mixer designed for you.\n\nBuilt by heyjoseluna.\nInspired by Ahmed Gagan.\n\nAudio is processed locally and is never saved or uploaded."
         alert.addButton(withTitle: "Done")
         alert.runModal()
     }
@@ -215,7 +221,9 @@ struct MixerView: View {
     #endif
 
     private var apps: [AudioApp] {
-        engine.processMonitor.apps.sorted { lhs, rhs in
+        engine.processMonitor.apps.filter {
+            options.showIdleApps || $0.isPlaying || !engine.volume(for: $0).isNeutral
+        }.sorted { lhs, rhs in
             if lhs.isPlaying != rhs.isPlaying { return lhs.isPlaying }
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
@@ -288,7 +296,6 @@ struct MixerView: View {
             if let error = settingsError {
                 Text(error).font(.caption).foregroundStyle(.red).padding(.top, 8)
             }
-            footer.padding(.top, 10)
         }
         .padding(.horizontal, 18).padding(.top, 18).padding(.bottom, 14)
         .frame(width: MixerLayout.width, height: MixerLayout.height)
@@ -300,10 +307,7 @@ struct MixerView: View {
             Image(systemName: "slider.vertical.3")
                 .font(.system(size: 17, weight: .regular)).frame(width: 20)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Levels").font(.system(size: 20, weight: .semibold)).tracking(-0.8)
-                Text("Volume mixer").font(.system(size: 11)).foregroundStyle(palette.secondary)
-            }
+            Text("Levels").font(.system(size: 20, weight: .semibold)).tracking(-0.8)
             Spacer()
             optionsMenu
         }
@@ -550,18 +554,6 @@ struct MixerView: View {
         .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    private var footer: some View {
-        VStack(spacing: 10) {
-            Rectangle().fill(palette.line).frame(height: 1)
-            HStack(spacing: 7) {
-                Image(systemName: "checkmark.shield").font(.system(size: 14)).accessibilityHidden(true)
-                Text(engine.isStarted ? "On your Mac. Just your Mac." : "Connecting…")
-                Spacer()
-                Text(scheme == .dark ? "Dark" : "Light")
-            }.font(.system(size: 11)).foregroundStyle(palette.secondary)
-        }
-    }
-
     private func sectionTitle(_ text: String) -> some View {
         Text(text).font(.system(size: 10, weight: .medium)).tracking(1.1).foregroundStyle(palette.secondary)
     }
@@ -614,7 +606,7 @@ private struct AppLevelRow: View {
                     Text(app.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
                     HStack(spacing: 5) {
                         Circle().fill(palette.fill.opacity(volume.isMuted ? 0.35 : 0.65)).frame(width: 4, height: 4)
-                        Text(error != nil ? "Not applied · retry or reset" : (app.isPlaying ? (volume.isMuted ? "Muted" : "Playing") : "Idle"))
+                        Text(error != nil ? "Not applied · retry or reset" : (volume.isMuted ? "Muted" : (app.isPlaying ? "Playing" : "Idle · level remembered")))
                             .font(.system(size: 10)).foregroundStyle(error != nil ? Color.orange : palette.secondary)
                     }
                 }

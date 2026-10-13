@@ -1,4 +1,4 @@
-LEVELS 0.1.2 — PUBLIC BETA (NOT NOTARIZED)
+LEVELS 0.1.3 — PUBLIC BETA (NOT NOTARIZED)
 
 A menu-bar volume mixer for your Mac.
 
@@ -50,7 +50,7 @@ No update feed has been published yet; this beta needs manual replacement
 when a new download is released. It does not ask for an account or subscription.
 
 Credits
-Built by Hey José Luna. Inspired by Ahmed Gagan.
+Built by heyjoseluna. Inspired by Ahmed Gagan.
 Audio engine adapted from Fader by pantafive under the MIT license.
 See the Licenses folder and the license included inside Levels.app.
 Update framework: Sparkle Project. Its license is in the Licenses folder.
