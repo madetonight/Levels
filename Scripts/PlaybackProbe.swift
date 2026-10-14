@@ -9,6 +9,7 @@ import Synchronization
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.finishLaunching()
         let continuous = CommandLine.arguments.contains("--continuous")
+        let pauseEngine = CommandLine.arguments.contains("--pause-engine")
         let engine = AVAudioEngine()
         let format = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2)!
         let beginning = Atomic<UInt64>(0)
@@ -34,6 +35,9 @@ import Synchronization
         print("Probe started", ProcessInfo.processInfo.systemUptime)
         fflush(stdout)
         while ProcessInfo.processInfo.systemUptime < finish {
+            let elapsed = Double(DispatchTime.now().uptimeNanoseconds - beginning.load(ordering: .relaxed)) / 1_000_000_000
+            if pauseEngine, elapsed >= 4, elapsed < 8, engine.isRunning { engine.stop() }
+            if pauseEngine, elapsed >= 8, !engine.isRunning { try engine.start() }
             RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
         }
         print("Probe stopped", ProcessInfo.processInfo.systemUptime)

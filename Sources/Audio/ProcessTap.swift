@@ -35,7 +35,7 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
     var handoffDiagnostics: (intercepting: Bool, buffers: Int, peak: Float) {
         (intercepting.load(ordering: .acquiring), renderedBuffers.load(ordering: .relaxed), lastRenderedPeak.load(ordering: .relaxed))
     }
-    func simulateIOStallForTesting() { simulateStall.store(true, ordering: .relaxed) }
+    func simulateIOStallForTesting(_ enabled: Bool = true) { simulateStall.store(enabled, ordering: .relaxed) }
     var activityDiagnostics: String { "tap=\(tapID) aggregate=\(aggregateID) float32=\(_isFloat32) received=\(activity.hasReceivedAudio)" }
     #endif
 
@@ -195,21 +195,51 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
     /// Called only for control taps. Monitoring taps stay nonmuting forever.
     /// A dead IO path restores native playback instead of retaining a mute.
     @MainActor
-    func beginHandoff(onFailure: @escaping @MainActor (ProcessTap) -> Void) {
+    func beginHandoff(onRecovered: @escaping @MainActor () -> Void = {},
+                      onFailure: @escaping @MainActor (ProcessTap) -> Void) {
         guard !monitorOnly, handoffTask == nil else { return }
         handoffTask = Task { @MainActor [weak self] in
+            var runningSince: UInt64?
+            var interceptedAt: UInt64?
+            var reportedRecovery = false
             while !Task.isCancelled {
-                do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
                 guard let self, tapID.isValid else { return }
-                let now = DispatchTime.now().uptimeNanoseconds
                 let callback = lastCallback.load(ordering: .acquiring)
-                if TapHandoffPolicy.isStalled(now: now, activatedAt: activatedAt, lastCallback: callback) {
+                let now = DispatchTime.now().uptimeNanoseconds
+                let outputRunning = processObjectIDs.contains { $0.readProcessIsRunningOutput() }
+                if outputRunning { if runningSince == nil { runningSince = now } }
+                else { runningSince = nil }
+                switch TapHandoffPolicy.action(now: now, lastCallback: callback,
+                    runningSince: runningSince, isAlive: isAlive) {
+                case .recover:
                     invalidate()
                     onFailure(self)
                     return
+                case .releaseIdle:
+                    // An app is allowed to pause its engine. Restore its native
+                    // path quietly and wait for fresh samples before reapplying.
+                    readyToHandoff.store(false, ordering: .releasing)
+                    interceptedAt = nil
+                    if intercepting.load(ordering: .acquiring), let description = tapDescription {
+                        description.muteBehavior = .unmuted
+                        intercepting.store(false, ordering: .releasing)
+                        do { try tapID.writeObjectReference(kAudioTapPropertyDescription, value: description) }
+                        catch { invalidate(); onFailure(self); return }
+                    }
+                    continue
+                case .wait: break
+                }
+                if let began = interceptedAt, !reportedRecovery, now - began >= 3_000_000_000,
+                   callback > 0, now - callback < TapHandoffPolicy.timeout {
+                    reportedRecovery = true
+                    onRecovered()
                 }
                 guard !intercepting.load(ordering: .acquiring),
-                      readyToHandoff.load(ordering: .acquiring), let description = tapDescription else { continue }
+                      readyToHandoff.load(ordering: .acquiring), callback > 0,
+                      now - callback < TapHandoffPolicy.timeout,
+                      activity.isPlaying(now: now), let description = tapDescription else { continue }
+                interceptedAt = now
                 description.muteBehavior = .mutedWhenTapped
                 intercepting.store(true, ordering: .releasing)
                 do {

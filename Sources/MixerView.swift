@@ -714,7 +714,7 @@ private struct AppLevelRow: View {
                         .layoutPriority(1)
                     HStack(spacing: 5) {
                         Circle().fill(palette.fill.opacity(volume.isMuted ? 0.35 : 0.65)).frame(width: 4, height: 4)
-                        Text(error != nil ? "Not applied · retry or reset" : (volume.isMuted ? "Muted" : (volume.volume == 0 ? "Silent" : (app.isPlaying ? "Playing" : "Idle"))))
+                        Text(error != nil ? (engine.isRecovering(app.bundleID) ? "Reconnecting" : "Not applied") : (volume.isMuted ? "Muted" : (volume.volume == 0 ? "Silent" : (app.isPlaying ? "Playing" : "Idle"))))
                             .font(.system(size: 10)).foregroundStyle(error != nil ? Color.orange : palette.secondary)
                             .lineLimit(1)
                     }

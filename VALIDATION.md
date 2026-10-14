@@ -42,3 +42,12 @@ Published v0.1.8-beta from source commit f851ee0. All four public release assets
 
 An isolated real 0.1.7 app checked the public feed and installed/relaunched 0.1.8/build 12. Installed executable bytes matched the final Release app; strict nested signatures and the stable certificate designated requirement passed. Saved app volume, mute, routing, feature and appearance choices were unchanged. The final shipping app was restored to the normal project build location and launched as a menu-bar app. Broader hardware listening and sleep/wake testing remain pending.
 
+
+
+## Levels 0.1.9 / build 13 — paused streams and automatic recovery
+
+95 tests in 21 suites passed. Native sandboxed audio checks passed for adjusted PCM, explicit mute/unmute, an injected active callback stall, a genuinely stopped/resumed audio engine, and automatic MixerEngine reconnection without a slider action. Idle streams remained nonmuting without an error; resuming restored the selected level and route. The integrated retry test verified a replacement tap, restored output samples, cleared recovery state and retained saved controls. The test volume preferences were isolated from normal app preferences.
+
+The watchdog distinguishes a paused source from failing active playback, provides a fresh resume grace period and waits longer for initial driver callbacks. Genuine failures restore native playback and retry independently per app with delays capped at 30 seconds. Helper replacement can reconnect immediately; obsolete retries are cancelled across reset, quit and sleep. Checking runs at 250 ms instead of 100 ms.
+
+Optimized arm64 Release build, strict nested signatures and DMG checksums passed. The owner signing identity, sandbox and update verification configuration remain unchanged from 0.1.8. Broader physical-device listening and sleep/wake tests remain pending.

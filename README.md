@@ -61,11 +61,11 @@ To build the optimized Apple silicon release and its drag-to-Applications disk i
 ./Scripts/package-dmg.sh
 ```
 
-This preserves the regular development build, places the optimized app and ZIP in `dist/Release/`, and creates `dist/Levels-0.1.8-arm64.dmg`. The image includes the app, an Applications shortcut, install/privacy notes, and MIT attribution. The owner beta has an Apple Development signature, but no Developer ID distribution signature or Apple notarization. First-launch Gatekeeper approval can still be required. Do not describe it as a notarized public installer. Package measurements and verification results are in `dist/Beta/package-details.json`.
+This preserves the regular development build, places the optimized app and ZIP in `dist/Release/`, and creates `dist/Levels-0.1.9-arm64.dmg`. The image includes the app, an Applications shortcut, install/privacy notes, and MIT attribution. The owner beta has an Apple Development signature, but no Developer ID distribution signature or Apple notarization. First-launch Gatekeeper approval can still be required. Do not describe it as a notarized public installer. Package measurements and verification results are in `dist/Beta/package-details.json`.
 
 ## Downloadable beta
 
-[Download Levels 0.1.8 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.8-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
+[Download Levels 0.1.9 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.9-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
 
 Run `Scripts/package-beta.sh` to package the existing optimized app in `dist/Release/Levels.app` as a clearly labeled, unnotarized beta. After source changes, rebuild with `Scripts/package-dmg.sh` first. The beta DMG, app-only ZIP, portable checksums, release notes, and package measurements are kept in `dist/Beta/`. See BETA.md for publishing and installation validation.
 

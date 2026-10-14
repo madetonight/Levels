@@ -81,12 +81,49 @@ struct OutputAppSections {
     }
 }
 
-/// A live HAL object is insufficient: IO must continue delivering usable buffers.
-/// No signal requirement here: an idle or intentionally muted stream is valid.
+/// A paused app may stop delivering buffers without its HAL objects dying.
+/// Absence of callbacks is only a failure after playback has actually started.
 enum TapHandoffPolicy {
+    enum Action { case wait, releaseIdle, recover }
     static let timeout: UInt64 = 2_000_000_000
-    static func isStalled(now: UInt64, activatedAt: UInt64, lastCallback: UInt64) -> Bool {
-        let reference = lastCallback == 0 ? activatedAt : lastCallback
-        return now >= reference && now - reference > timeout
+    static func action(now: UInt64, lastCallback: UInt64, runningSince: UInt64?,
+                       isAlive: Bool) -> Action {
+        guard isAlive else { return .recover }
+        guard lastCallback > 0 else {
+            // Drivers can publish a stream before delivering its first IO.
+            if let began = runningSince, now >= began, now - began > 5_000_000_000 { return .recover }
+            return .wait
+        }
+        let reference = max(lastCallback, runningSince ?? 0)
+        guard now >= reference, now - reference > timeout else { return .wait }
+        return runningSince == nil ? .releaseIdle : .recover
     }
+}
+
+/// Remember failure count independently of the current tap. Retrying must
+/// neither require touching a slider nor loop rapidly on a broken driver.
+struct TapRecoverySchedule {
+    struct Entry {
+        var processes: [UInt32]
+        var failures: Int
+        var retryAt: TimeInterval?
+    }
+    private(set) var entries: [String: Entry] = [:]
+    var nextRetry: TimeInterval? { entries.values.compactMap(\.retryAt).min() }
+    func canAttempt(_ id: String, processes: [UInt32], now: TimeInterval) -> Bool {
+        guard let entry = entries[id], entry.processes == processes else { return true }
+        return entry.retryAt.map { now >= $0 } ?? true
+    }
+    mutating func attempted(_ id: String, processes: [UInt32]) {
+        if entries[id]?.processes == processes { entries[id]?.retryAt = nil }
+        else { entries[id] = nil }
+    }
+    mutating func failed(_ id: String, processes: [UInt32], now: TimeInterval) {
+        let previous = entries[id]?.processes == processes ? entries[id]?.failures ?? 0 : 0
+        let delay = min(30, 0.5 * pow(2, Double(min(previous, 6))))
+        entries[id] = Entry(processes: processes, failures: previous + 1, retryAt: now + delay)
+    }
+    mutating func clear(_ id: String) { entries[id] = nil }
+    mutating func clearAll() { entries.removeAll() }
+    mutating func retain(_ ids: Set<String>) { entries = entries.filter { ids.contains($0.key) } }
 }

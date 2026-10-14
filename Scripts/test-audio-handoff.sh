@@ -28,15 +28,24 @@ python3 - "$LEVELS_AUDIO_TEST_DIR" <<'PY'
 from pathlib import Path
 import json,subprocess,sys
 root=Path(sys.argv[1])
-with (root/'tone.log').open('w') as log:
-    tone=subprocess.Popen([str(root/'PlaybackProbe.app/Contents/MacOS/PlaybackProbe'),'--continuous'],stdout=log,stderr=log)
-    try:
-        result=subprocess.run([str(root/'Levels.app/Contents/MacOS/Levels')],capture_output=True,text=True,timeout=40)
-    finally:
-        if tone.poll() is None: tone.terminate();tone.wait()
-(root/'test.log').write_text(result.stdout+result.stderr)
-proof=json.loads(result.stdout.splitlines()[0])
-(root/'result.json').write_text(json.dumps(proof,indent=2)+'\n')
-print(json.dumps(proof,indent=2))
-if result.returncode or not proof.get('passed'): raise SystemExit('Audio handoff FAILED')
+proofs={}
+for mode in ['active-stall','idle-resume','auto-recovery']:
+    with (root/f'{mode}-tone.log').open('w') as log:
+        args=[str(root/'PlaybackProbe.app/Contents/MacOS/PlaybackProbe'),'--continuous']
+        if mode=='idle-resume': args.append('--pause-engine')
+        tone=subprocess.Popen(args,stdout=log,stderr=log)
+        try:
+            args=[str(root/'Levels.app/Contents/MacOS/Levels')]
+            if mode=='idle-resume': args.append('--idle-resume')
+            if mode=='auto-recovery': args.append('--auto-recovery')
+            result=subprocess.run(args,capture_output=True,text=True,timeout=40)
+        finally:
+            if tone.poll() is None: tone.terminate();tone.wait()
+    (root/f'{mode}.log').write_text(result.stdout+result.stderr)
+    proof=json.loads(result.stdout.splitlines()[0]);proofs[mode]=proof
+    print(json.dumps({mode:proof},indent=2))
+    if result.returncode or not proof.get('passed'):
+        (root/'result.json').write_text(json.dumps(proofs,indent=2)+'\n')
+        raise SystemExit('Audio handoff FAILED')
+(root/'result.json').write_text(json.dumps(proofs,indent=2)+'\n')
 PY

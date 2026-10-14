@@ -39,7 +39,8 @@ final class MixerEngine {
         set { tapLifecycle.taps = newValue }
     }
     @ObservationIgnored private var permissionDeniedApps: Set<String> = []
-    @ObservationIgnored private var failedTapProcesses: [String: [AudioObjectID]] = [:]
+    @ObservationIgnored private var tapRecovery = TapRecoverySchedule()
+    @ObservationIgnored private var tapRecoveryTask: Task<Void, Never>?
     /// One volume control per pinned-and-present device, keyed by UID — each
     /// routed output gets its own slider, like multi-output members.
     @ObservationIgnored private var routeVolumes: [String: DeviceVolumeController] = [:]
@@ -123,13 +124,16 @@ final class MixerEngine {
     }
 
     func retryAudioAccess() {
-        failedTapProcesses.removeAll()
+        tapRecovery.clearAll()
         permissionDeniedApps.removeAll()
         needsAudioCapturePermission = false
         syncTaps()
     }
 
     func resetAllVolumes() {
+        tapRecovery.clearAll()
+        tapRecoveryTask?.cancel()
+        tapRecoveryTask = nil
         for tap in taps.values { tap.invalidate() }
         taps.removeAll()
         volumes.removeAll()
@@ -190,6 +194,8 @@ final class MixerEngine {
     /// the level it is about to play, a smooth rise instead of a slam. Muted
     /// taps render silence and can't fade audibly, so they restore as-is.
     func fadeOutAndStop() {
+        tapRecoveryTask?.cancel()
+        tapRecoveryTask = nil
         volumeKeys.suspend()
         processMonitor.setMeteringVisible(false)
         saveTask?.cancel()
@@ -215,7 +221,9 @@ final class MixerEngine {
     // MARK: - Private
 
     func discardHALBoundState() {
-        failedTapProcesses.removeAll()
+        tapRecoveryTask?.cancel()
+        tapRecoveryTask = nil
+        tapRecovery.clearAll()
         tapLifecycle.discard()
         routeVolumes.removeAll()
     }
@@ -262,7 +270,7 @@ final class MixerEngine {
     }
 
     private func apply(_ entry: AppVolume, to app: AudioApp) {
-        failedTapProcesses[app.bundleID] = nil
+        tapRecovery.clear(app.bundleID)
         volumes[app.bundleID] = entry
         scheduleSave()
 
@@ -284,6 +292,7 @@ final class MixerEngine {
         let output = softwareLevel(for: entry)
         let control = TapControlState(app: entry, output: output)
         if !control.requiresTap {
+            tapRecovery.clear(app.bundleID)
             // Unity returns to the app's original audio path immediately.
             taps.removeValue(forKey: app.bundleID)?.invalidate()
             tapErrors[app.bundleID] = nil
@@ -315,6 +324,9 @@ final class MixerEngine {
         let apps = AudioApp.coalescedByBundleID(processMonitor.apps)
         let running = Dictionary(uniqueKeysWithValues: apps.map { ($0.bundleID, $0) })
 
+        let withProcesses = Set(running.values.filter { !$0.objectIDs.isEmpty }.map(\.bundleID))
+        for id in tapRecovery.entries.keys where !withProcesses.contains(id) { tapErrors[id] = nil }
+        tapRecovery.retain(withProcesses)
         for (bundleID, tap) in taps {
             guard let app = running[bundleID] else {
                 tap.invalidate()
@@ -354,8 +366,10 @@ final class MixerEngine {
         // pinned to another aggregate is unproven (the CLI probe's IO proc
         // never fired), and a silently dead tap would mute the app outright.
         // Saved volumes survive and re-apply once multi-output dissolves.
-        guard !tapLifecycle.isSleeping, !multiOutput.isActive,
-              failedTapProcesses[app.bundleID] != app.objectIDs else { return }
+        guard !tapLifecycle.isSleeping, !multiOutput.isActive, !permissionDeniedApps.contains(app.bundleID),
+              tapRecovery.canAttempt(app.bundleID, processes: app.objectIDs,
+                  now: ProcessInfo.processInfo.systemUptime) else { return }
+        tapRecovery.attempted(app.bundleID, processes: app.objectIDs)
         let outputs: [ProcessTap.Output]
         do {
             outputs = try resolvedOutputs(for: entry)
@@ -363,6 +377,7 @@ final class MixerEngine {
             // Transient device churn (output switching), not a permission issue.
             tapErrors[app.bundleID] = "Output device is temporarily unavailable."
             Self.logger.error("Default device read failed: \(error.localizedDescription)")
+            scheduleTapRetry(for: app)
             return
         }
         // Routing changes only where this app plays. Its own gain and mute
@@ -378,11 +393,13 @@ final class MixerEngine {
             )
             try tap.activate(outputs: outputs)
             guard tapLifecycle.install(tap, for: app.bundleID) else { return }
-            tap.beginHandoff { [weak self] failed in
+            tap.beginHandoff(onRecovered: { [weak self] in
+                self?.tapRecovery.clear(app.bundleID)
+            }) { [weak self] failed in
                 guard let self, self.taps[app.bundleID] === failed else { return }
                 self.taps[app.bundleID] = nil
-                self.failedTapProcesses[app.bundleID] = app.objectIDs
-                self.tapErrors[app.bundleID] = "Audio adjustment stopped. Native playback restored; change the level to retry."
+                self.scheduleTapRetry(for: app)
+                self.tapErrors[app.bundleID] = "Audio controls are reconnecting automatically. Native playback is active."
             }
             permissionDeniedApps.remove(app.bundleID)
             needsAudioCapturePermission = !permissionDeniedApps.isEmpty
@@ -396,6 +413,28 @@ final class MixerEngine {
                 permissionDeniedApps.remove(app.bundleID)
             }
             needsAudioCapturePermission = !permissionDeniedApps.isEmpty
+            if !permissionDeniedApps.contains(app.bundleID) { scheduleTapRetry(for: app) }
+        }
+    }
+
+    func isRecovering(_ bundleID: String) -> Bool { tapRecovery.entries[bundleID] != nil }
+
+    private func scheduleTapRetry(for app: AudioApp) {
+        tapRecovery.failed(app.bundleID, processes: app.objectIDs, now: ProcessInfo.processInfo.systemUptime)
+        scheduleNextTapRetry()
+    }
+
+    private func scheduleNextTapRetry() {
+        tapRecoveryTask?.cancel()
+        tapRecoveryTask = nil
+        guard !tapLifecycle.isSleeping, !multiOutput.isActive, let deadline = tapRecovery.nextRetry else { return }
+        let delay = max(0.05, deadline - ProcessInfo.processInfo.systemUptime)
+        tapRecoveryTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            guard let self, !tapLifecycle.isSleeping else { return }
+            tapRecoveryTask = nil
+            syncTaps()
+            scheduleNextTapRetry()
         }
     }
 

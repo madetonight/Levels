@@ -1,4 +1,4 @@
-LEVELS 0.1.8 — PUBLIC BETA (NOT NOTARIZED)
+LEVELS 0.1.9 — PUBLIC BETA (NOT NOTARIZED)
 
 A menu-bar volume mixer for your Mac.
 

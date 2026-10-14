@@ -1,36 +1,25 @@
-# Levels 0.1.8 beta
+# Levels 0.1.9 beta
 
-Safe audio handoff, a compact mixer, and quiet update notifications.
+Pausing Spotify or another audio app no longer leaves its controls blocked.
 
 ## What changed
 
-- Startup no longer mutes native playback before the replacement audio path delivers real samples. Stalled callbacks release the tap and restore native playback; saved levels and routes are retained.
-- Process taps use their own appended input buffer rather than a physical microphone stream. Passive meters remain nonmuting.
-- This beta uses the owner’s stable Apple Development certificate. The first switch may require audio access approval once; later builds keep the same signing identity. It is not Apple-notarized.
-
-- A small white update-available dot appears on the menu-bar icon and Options button. The Updates menu offers the available version. Scheduled checks use a gentle indicator; manual checks open the install dialog.
-- Automatic update checks are enabled for new installs. Existing choices, including an explicit opt-out, are preserved. Installation still requires approval.
-- Full selected-output names appear in wider thin buttons below each app slider. Playback status sits beside the app name and uses Playing/Idle wording, while mute and zero-volume states remain distinct.
-- San Francisco typography for Master volume; the larger master percentage shares the app-percentage column. Sliders retain their travel and aligned controls.
-- Ordinary volume, routing, startup, sleep recovery and device-change handling no longer scan paired Bluetooth devices. Connected Bluetooth outputs remain available through Core Audio. Direct Bluetooth access waits for an explicit connect/disconnect action.
-- Saved volume, mute, routing and appearance choices are retained.
+- Idle apps and stopped audio engines are treated as normal pauses. Native playback stays available; fresh samples reapply the saved volume when playback resumes.
+- Genuine tap or device failures restore native playback and retry automatically, with a delay that increases up to 30 seconds if a driver keeps failing. You do not need to move the slider or reset the app.
+- Recovery is independent for each app. New audio helpers reconnect immediately. Reset, quit and sleep cancel obsolete retries.
+- During a genuine failure, the status says Reconnecting. Saved volume, mute and output choices are retained.
+- The watchdog checks less frequently than 0.1.8 while keeping the silent-playback safeguards.
 
 ## Install or update
 
-Already using a connected beta (0.1.5 or later)? Choose Options → Updates → Check for Updates. Daily checks are optional, and installation requires your approval. Saved volume, mute, routing, and appearance choices are retained. Update archives are verified with Levels' dedicated signing key.
+Choose Options → Updates → Check for Updates. The same tested app is in the downloadable beta DMG. Updates are verified with Levels' signing key and installation requires approval.
 
-First install: download the beta DMG, drag Levels to Applications, eject the image, and open Levels. The DMG includes an Open Privacy & Security shortcut to make Apple's first-launch approval easier to reach. Levels lives in the menu bar; Settings opens only when requested.
-
-**Zero-budget, not Apple-notarized.** macOS may block a browser-downloaded first launch. If you trust Levels, follow [Apple's Open Anyway instructions](https://support.apple.com/102445). A free ad-hoc or updater signature cannot replace Apple notarization. Managed Macs may restrict approval. No system security setting is disabled.
+This release keeps the same Apple Development signing certificate as 0.1.8. It does not reset audio permissions or scan paired Bluetooth devices on startup. macOS controls permission persistence. It is not Apple-notarized; a first browser-downloaded launch may still require [Apple's Open Anyway approval](https://support.apple.com/102445).
 
 ## Requirements and privacy
 
-Apple silicon, macOS 15+. Native Liquid Glass requires macOS 26+. Per-app controls and signal detection need System Audio Recording permission. Audio is processed locally and never saved or uploaded. Passive measurement exists only while the mixer is visible and does not mute or reroute native playback. A process with an adjusted level or route still needs its control tap while Levels is running. Quitting restores native playback.
+Apple silicon, macOS 15+. Liquid Glass requires macOS 26+. Per-app audio adjustment requires System Audio Recording permission. Audio is processed locally, never saved or uploaded. Automatic checks preserve existing opt-outs; the white update indicator remains available.
 
-## Beta testing
-
-Automated checks cover independent reset, saved preferences, silent audio, signal detection, helper churn, limiter behavior, and existing audio regressions. Physical HDMI/DisplayPort keyboard controls, Bluetooth codec quality, and broader hardware sleep/wake testing remain pending.
-
-Report bugs at https://github.com/madetonight/Levels/issues with Mac model, macOS version, devices, and reproduction steps. Please do not upload private recordings.
+Regression checks cover pause/resume grace, silent streams, delayed retries, independent apps and helper replacement. Native hardware tests exercise an engine stop/resume and an injected active callback stall. Broader Bluetooth, external monitor and sleep/wake listening tests remain pending.
 
 Built by heyjoseluna. Inspired by Ahmed Gagan. MIT and Sparkle notices are included.
