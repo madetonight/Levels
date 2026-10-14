@@ -9,3 +9,5 @@
 - Ed25519 update archive signature and size verified against the embedded public key; altered bytes rejected. The private key remains in Keychain.
 
 Physical HDMI/DisplayPort keyboard controls, Bluetooth quality, and broader device/sleep/wake tests remain pending. A fresh first launch on another Mac is unverified; unnotarized browser downloads may require Apple's per-app Open Anyway approval. Source/build/signature checks do not remove that requirement.
+
+Live in-app update verified: an older connected 0.1.5 build checked the public feed, downloaded, installed, and relaunched the exact 0.1.6 Release executable. Strict signatures and saved volume/mute/routing/appearance choices remained intact. The four public release assets matched their local bytes; the deployed public feed matched the generated XML.
