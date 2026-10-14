@@ -4,6 +4,8 @@ extension MixerEngine {
     /// Release audio interception before sleep. The stored levels and routes
     /// remain intact; cached aggregate existence is not proof of running IO.
     func prepareForSleep() {
+        volumeKeys.suspend()
+        processMonitor.suspendMeasurement()
         routingTask?.cancel()
         routingTask = nil
         bluetoothRefreshTask?.cancel()
@@ -18,6 +20,8 @@ extension MixerEngine {
         wakeResyncTask?.cancel()
         tapLifecycle.prepareForWake()
         resyncAudioState()
+        processMonitor.resumeMeasurement()
+        volumeKeys.resume()
         // Drivers and IOBluetooth often publish their final object IDs shortly
         // after didWake. One controlled second pass replaces a notification
         // storm and catches devices that were not ready on the immediate pass.
@@ -42,6 +46,7 @@ extension MixerEngine {
         inputVolume.resync()
         processMonitor.refresh()
         bluetooth.refresh()
+        updatePreferredMicrophone()
         reconcileTapRouting()
     }
 }

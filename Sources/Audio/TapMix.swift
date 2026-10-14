@@ -26,7 +26,7 @@ enum TapMix {
     /// after the final frame.
     static func mix(input: UnsafePointer<Float>, inputLayout: Layout,
                     output: UnsafeMutablePointer<Float>, outputLayout: Layout,
-                    gain: Gain) -> Float {
+                    gain: Gain, limiter: UnsafeMutablePointer<PeakLimiter>? = nil) -> Float {
         let inChannels = max(1, inputLayout.channels)
         let outChannels = max(1, outputLayout.channels)
         let frames = min(inputLayout.count / inChannels, outputLayout.count / outChannels)
@@ -53,6 +53,7 @@ enum TapMix {
                     output[outBase + channel] = input[inBase + min(channel, inChannels - 1)] * frameGain
                 }
             }
+            limiter?.pointee.process(frame: output.advanced(by: outBase), channels: outChannels)
         }
         // Snap once converged: stops the asymptotic tail (denormal-prone
         // when ramping to 0 on non-Apple-silicon FPUs).

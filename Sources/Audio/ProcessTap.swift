@@ -11,6 +11,8 @@ import os
 /// read lock-free by the real-time HAL IO thread. Aligned Float32/Bool loads and
 /// stores are atomic on Apple silicon, so no locking is needed for these.
 final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
+    let activity = AudioSignalActivity()
+    private let monitorOnly: Bool
     static let logger = Logger(subsystem: "com.joseluna.levels", category: "ProcessTap")
     /// Fader never needs exclusive hardware access, and its audio IO must not
     /// keep the CPU awake while the rest of the machine is idle.
@@ -19,11 +21,17 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
         try? AudioObjectID.system.write(kAudioHardwarePropertyHogModeIsAllowed, value: UInt32(0))
     }
 
-    /// Slider position, 0.0...1.0. Read by the RT thread every buffer and
+    #if RENDER_SHOTS
+    var activityDiagnostics: String { "tap=\(tapID) aggregate=\(aggregateID) float32=\(_isFloat32) received=\(activity.hasReceivedAudio)" }
+    #endif
+
+    /// Slider position, 0.0...2.0. Read by the RT thread every buffer and
     /// run through `taperedGain` before it reaches the samples — the stored
     /// value stays linear position so the UI and VolumeStore keep their
-    /// 0...1 semantics.
+    /// 0...2 slider semantics (unity remains at 1).
     private nonisolated(unsafe) var _volume: Float
+    private nonisolated(unsafe) var _outputGain: Float
+    private nonisolated(unsafe) var _limiter = PeakLimiter()
     /// Mute flag. Read by the RT thread every buffer.
     private nonisolated(unsafe) var _isMuted: Bool
     /// Gain ramped towards `_volume` per frame to avoid clicks. RT thread only.
@@ -62,7 +70,12 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
 
     var volume: Float {
         get { _volume }
-        set { _volume = max(0, min(1, newValue)) }
+        set { _volume = VolumeTaper.clampedPosition(newValue) }
+    }
+
+    var outputGain: Float {
+        get { _outputGain }
+        set { _outputGain = newValue.isFinite ? max(0, min(1, newValue)) : 1 }
     }
 
     var isMuted: Bool {
@@ -70,26 +83,29 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
         set { _isMuted = newValue }
     }
 
-    init(processObjectIDs: [AudioObjectID], volume: Float = 1.0, isMuted: Bool = false) {
-        Self.configureHALPowerPolicy()
+    init(processObjectIDs: [AudioObjectID], volume: Float = 1.0, isMuted: Bool = false, outputGain: Float = 1, monitorOnly: Bool = false) {
+        self.monitorOnly = monitorOnly
+        if !monitorOnly { Self.configureHALPowerPolicy() }
         self.processObjectIDs = processObjectIDs
-        _volume = volume
+        _volume = VolumeTaper.clampedPosition(volume)
+        _outputGain = max(0, min(1, outputGain))
         _isMuted = isMuted
-        _currentGain = VolumeTaper.gain(position: volume)
+        _currentGain = VolumeTaper.gain(position: _volume) * _outputGain
     }
 
     /// Builds the tap → aggregate → IO proc chain. The first UID is the clock
     /// (and main) sub-device; any others stack on with drift compensation, so
     /// the app fans out to several devices at once.
-    @MainActor
     func activate(outputs: [Output]) throws {
         guard !aggregateID.isValid else { return }
-        guard let clockUID = outputs.first?.uid else { return }
+        guard !outputs.isEmpty else { return }
+        guard !processObjectIDs.isEmpty else { return }
+        let clockUID = outputs.first?.uid ?? ""
         activatedOutputs = outputs
 
         let description = CATapDescription(stereoMixdownOfProcesses: processObjectIDs)
         description.uuid = UUID()
-        description.muteBehavior = .mutedWhenTapped
+        description.muteBehavior = monitorOnly ? .unmuted : .mutedWhenTapped
         description.isPrivate = true
         description.name = "\(AudioDevice.plumbingNamePrefix) tap #\(processObjectIDs.first ?? 0)"
 
@@ -125,8 +141,15 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
         var sampleRate: Float64 = 48000
         try? aggregateID.read(kAudioDevicePropertyNominalSampleRate, into: &sampleRate)
         _rampCoefficient = 1 - exp(-1 / (Float(sampleRate) * 0.030))
+        _limiter = PeakLimiter(sampleRate: sampleRate)
 
         verifyStreamFormat()
+        if monitorOnly {
+            var format = AudioStreamBasicDescription()
+            _isFloat32 = (try? tapID.read(kAudioTapPropertyFormat, into: &format)) != nil
+                && format.mFormatID == kAudioFormatLinearPCM
+                && format.mFormatFlags & kAudioFormatFlagIsFloat != 0 && format.mBitsPerChannel == 32
+        }
 
         var proc: AudioDeviceIOProcID?
         try checked(
@@ -151,7 +174,6 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
 
     /// Confirms the gain path's Float32 PCM assumption against the aggregate's
     /// actual stream format; any other format flips the render to passthrough.
-    @MainActor
     private func verifyStreamFormat() {
         var format = AudioStreamBasicDescription()
         guard (try? aggregateID.read(kAudioDevicePropertyStreamFormat,
@@ -209,6 +231,19 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
     // MARK: - Real-time path. No allocation, locks, ObjC, or logging below.
 
     private func render(_ input: UnsafePointer<AudioBufferList>, into output: UnsafeMutablePointer<AudioBufferList>) {
+        if _isFloat32 {
+            let now = DispatchTime.now().uptimeNanoseconds
+            for buffer in UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input)) {
+                if let data = buffer.mData {
+                    activity.observe(data.assumingMemoryBound(to: Float.self),
+                        count: Int(buffer.mDataByteSize) / MemoryLayout<Float>.size, now: now)
+                }
+            }
+        }
+        if monitorOnly {
+            Self.silence(output)
+            return
+        }
         if _isMuted {
             Self.silence(output)
             return
@@ -220,7 +255,7 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
 
         let inputs = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         let outputs = UnsafeMutableAudioBufferListPointer(output)
-        let targetGain = VolumeTaper.gain(position: _volume)
+        let targetGain = VolumeTaper.gain(position: _volume) * _outputGain
         var gain = _currentGain
         let ramp = _rampCoefficient
 
@@ -232,15 +267,16 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
             }
             // One ramp shared across the buffer list; in practice taps deliver
             // a single interleaved buffer, so this is exact.
-            gain = TapMix.mix(
+            gain = withUnsafeMutablePointer(to: &_limiter) { limiter in TapMix.mix(
                 input: inData.assumingMemoryBound(to: Float.self),
                 inputLayout: TapMix.Layout(channels: Int(inputs[index].mNumberChannels),
                                            count: Int(inputs[index].mDataByteSize) / MemoryLayout<Float>.size),
                 output: outData.assumingMemoryBound(to: Float.self),
                 outputLayout: TapMix.Layout(channels: Int(outBuffer.mNumberChannels),
                                             count: Int(outBuffer.mDataByteSize) / MemoryLayout<Float>.size),
-                gain: TapMix.Gain(current: gain, target: targetGain, ramp: ramp)
-            )
+                gain: TapMix.Gain(current: gain, target: targetGain, ramp: ramp),
+                limiter: targetGain > 1 || gain > 1 || limiter.pointee.isReducing ? limiter : nil
+            ) }
         }
         _currentGain = gain
     }

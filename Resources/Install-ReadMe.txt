@@ -1,4 +1,4 @@
-LEVELS 0.1.5 — PUBLIC BETA (NOT NOTARIZED)
+LEVELS 0.1.6 — PUBLIC BETA (NOT NOTARIZED)
 
 A menu-bar volume mixer for your Mac.
 
@@ -10,17 +10,20 @@ Install
 1. Quit any running copy of Levels.
 2. Drag Levels.app onto the Applications shortcut in this disk image.
 3. Eject the disk image and open Levels from Applications.
-4. If macOS blocks the first launch, open System Settings → Privacy & Security.
+4. If macOS blocks the first launch, open the included Open Privacy & Security
+   shortcut (or System Settings → Privacy & Security).
    Find the message about Levels, choose Open Anyway, and confirm if you trust
    the download. This approves Levels specifically; do not disable Gatekeeper.
    Apple instructions: https://support.apple.com/102445
 5. Click the Levels icon in the menu bar. No app window opens automatically.
 
 Output
-Click the device name under Master Volume to choose the Mac's default output.
+Use Options → Settings → Devices to choose the Mac's default output.
 Each application's slider adjusts its volume; its speaker button toggles mute.
 Use the output selector below an app's slider to choose where that app plays.
-Different apps can play through different outputs simultaneously.
+Different apps can play through different outputs simultaneously. Each app has
+a Reset button below its slider on the right. It restores the default level
+chosen in Settings → App volumes (100% initially), preserving mute and output.
 
 Input
 Select a microphone and adjust its gain when supported by the device.
@@ -31,7 +34,10 @@ The same options menu opens by right-clicking the Levels menu-bar icon.
 
 Audio access and privacy
 Per-app volume, mute, and routing need macOS System Audio Recording permission.
-Levels processes selected apps' audio locally in real time. It does not save
+Levels processes selected apps' audio locally in real time. While the mixer is
+open, passive nonmuting taps distinguish sound from silent open streams. They
+are released when the mixer closes. Playing means signal was measured; Output
+active means macOS reports an open output stream but measurement is unavailable. It does not save
 audio recordings or upload audio. macOS displays a privacy indicator while
 audio access is active. Your volume, mute, and output choices are remembered.
 

@@ -8,8 +8,16 @@
 /// perceived-loudness change. Kept pure and free of HAL imports so it unit-tests
 /// in the hostless bundle.
 enum VolumeTaper {
+    static let maximumPosition: Float = 2
+
+    static func clampedPosition(_ position: Float) -> Float {
+        position.isFinite ? max(0, min(maximumPosition, position)) : 1
+    }
+
     static func gain(position: Float) -> Float {
-        let p = max(0, min(1, position))
-        return p * p * p
+        let p = clampedPosition(position)
+        // Preserve every existing 0–100% setting. Boost uses amplitude gain,
+        // rather than cubing above unity (200% must not become 8× gain).
+        return p <= 1 ? p * p * p : p
     }
 }

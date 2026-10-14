@@ -25,6 +25,7 @@ LEVELS_ZIP="$LEVELS_RELEASE_DIR/Levels-$LEVELS_VERSION-arm64.zip"
 
 ln -s /Applications "$LEVELS_STAGE/Applications"
 cp "$PROJECT_ROOT/Resources/Install-ReadMe.txt" "$LEVELS_STAGE/Read Me.txt"
+cp "$PROJECT_ROOT/Resources/Open Privacy & Security.webloc" "$LEVELS_STAGE/Open Privacy & Security.webloc"
 mkdir "$LEVELS_STAGE/Licenses"
 cp "$PROJECT_ROOT/LICENSE" "$LEVELS_STAGE/Licenses/Fader-MIT-License.txt"
 cp "$PROJECT_ROOT/UPSTREAM.md" "$LEVELS_STAGE/Licenses/Attribution.txt"

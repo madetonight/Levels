@@ -23,6 +23,7 @@ trap 'rm -rf "$LEVELS_STAGE"' EXIT
 ditto "$LEVELS_APP" "$LEVELS_STAGE/Levels.app"
 ln -s /Applications "$LEVELS_STAGE/Applications"
 cp "$PROJECT_ROOT/Resources/Install-ReadMe.txt" "$LEVELS_STAGE/Read Me.txt"
+cp "$PROJECT_ROOT/Resources/Open Privacy & Security.webloc" "$LEVELS_STAGE/Open Privacy & Security.webloc"
 cp "$PROJECT_ROOT/Resources/Beta-Release-Notes.md" "$LEVELS_STAGE/Beta Notes.md"
 mkdir "$LEVELS_STAGE/Licenses"
 cp "$PROJECT_ROOT/LICENSE" "$LEVELS_STAGE/Licenses/Fader-MIT-License.txt"
@@ -58,7 +59,7 @@ details = {
     'zip_file': archive.name, 'zip_bytes': archive.stat().st_size,
     'app_logical_bytes': sum(p.stat().st_size for p in files),
     'app_file_count': len(files), 'sha256': hashes,
-    'contents': ['Levels.app', 'Applications', 'Read Me.txt', 'Beta Notes.md', 'Licenses', '.VolumeIcon.icns'],
+    'contents': ['Levels.app', 'Applications', 'Read Me.txt', 'Open Privacy & Security.webloc', 'Beta Notes.md', 'Licenses', '.VolumeIcon.icns'],
     'checks': ['Strict app signature verified', 'DMG checksum valid'],
     'first_launch': 'macOS normally blocks a downloaded unnotarized app; per-app Open Anyway approval may be available',
     'downloaded_installation_verified': False,

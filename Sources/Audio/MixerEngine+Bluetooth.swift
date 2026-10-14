@@ -1,6 +1,32 @@
 import Foundation
+import Observation
 
 extension MixerEngine {
+    func updatePreferredMicrophone() {
+        guard !tapLifecycle.isSleeping else { return }
+        let bluetoothOutput = deviceMonitor.devices.contains { device in
+            device.isBluetooth && (device.id == deviceMonitor.defaultDeviceID ||
+                volumes.values.contains { $0.outputDeviceUIDs.contains(device.uid) })
+        }
+        let current = inputDeviceMonitor.devices.first { $0.id == inputDeviceMonitor.defaultDeviceID }
+        if let preferred = BluetoothInputPolicy.preferredInput(enabled: keepMacMicrophone,
+            bluetoothOutput: bluetoothOutput, current: current, available: inputDeviceMonitor.devices) {
+            inputDeviceMonitor.setDefault(preferred)
+        }
+    }
+
+    func observeInputDevices() {
+        withObservationTracking {
+            _ = inputDeviceMonitor.devices
+            _ = inputDeviceMonitor.defaultDeviceID
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.updatePreferredMicrophone()
+                self?.observeInputDevices()
+            }
+        }
+    }
+
     /// Paired IOBluetooth peer of a HAL device, when one matches by MAC.
     func bluetoothPeer(for device: AudioDevice) -> BluetoothAudioDevice? {
         bluetooth.paired.first { device.matches(bluetoothID: $0.id) }

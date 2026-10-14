@@ -69,6 +69,14 @@
 		AC1000000000000000000005 = {isa = PBXBuildFile; fileRef = AC1000000000000000000002; };
 		AC1000000000000000000006 = {isa = PBXBuildFile; fileRef = AC1000000000000000000002; };
 		AC1000000000000000000007 = {isa = PBXBuildFile; fileRef = AC1000000000000000000003; };
+		B4112D440E158970C72B2827 /* PeakLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA56EC1362835EE9578CE4FD /* PeakLimiter.swift */; };
+		25BD4035B266FF58C19CA176 /* PeakLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA56EC1362835EE9578CE4FD /* PeakLimiter.swift */; };
+		C2D561EC3CFCD0AE771CFD2C /* AudioFeaturePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D565B75F8663FD461E4C4CC9 /* AudioFeaturePolicy.swift */; };
+		5082332AC817AEF1A1BD0842 /* AudioFeaturePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D565B75F8663FD461E4C4CC9 /* AudioFeaturePolicy.swift */; };
+		ABF5C562DD7E3ED0EB0545B9 /* MediaKeyVolumeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C5A3DFD9817F2A0F03655F /* MediaKeyVolumeController.swift */; };
+		8264C8874DE0431BB4CCB998 /* AudioFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F28570B00BB1EDD0D37396 /* AudioFeatureTests.swift */; };
+		AD0000000000000000000002 /* AudioPlaybackPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000000000000000000001; };
+		AD0000000000000000000003 /* AudioPlaybackPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000000000000000000001; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,6 +128,11 @@
 		AC1000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateController.swift; sourceTree = "<group>"; };
 		AC1000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateConfiguration.swift; sourceTree = "<group>"; };
 		AC1000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateConfigurationTests.swift; sourceTree = "<group>"; };
+		EA56EC1362835EE9578CE4FD /* PeakLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeakLimiter.swift; sourceTree = "<group>"; };
+		D565B75F8663FD461E4C4CC9 /* AudioFeaturePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFeaturePolicy.swift; sourceTree = "<group>"; };
+		F4C5A3DFD9817F2A0F03655F /* MediaKeyVolumeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaKeyVolumeController.swift; sourceTree = "<group>"; };
+		83F28570B00BB1EDD0D37396 /* AudioFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFeatureTests.swift; sourceTree = "<group>"; };
+		AD0000000000000000000001 /* AudioPlaybackPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackPolicy.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -146,6 +159,10 @@
 		7E15B8A3B2942527868881BC /* Audio */ = {
 			isa = PBXGroup;
 			children = (
+				AD0000000000000000000001 /* AudioPlaybackPolicy.swift */,
+				EA56EC1362835EE9578CE4FD /* PeakLimiter.swift */,
+				D565B75F8663FD461E4C4CC9 /* AudioFeaturePolicy.swift */,
+				F4C5A3DFD9817F2A0F03655F /* MediaKeyVolumeController.swift */,
 				C5B95BFA22594957AB63F880 /* AudioApp.swift */,
 				E452CE66AE958133862B9D7D /* AudioDevice.swift */,
 				9656742E8E3722908BC1D34F /* AudioDeviceMonitor.swift */,
@@ -192,6 +209,7 @@
 		DDD16BEF912896E4285B9600 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				83F28570B00BB1EDD0D37396 /* AudioFeatureTests.swift */,
 				6374073A5ABFE1A1A5F41D0D /* AudioAppTests.swift */,
 				58F275E8985144D6B4357662 /* BugfixTests.swift */,
 				AA2020202020202020202020 /* PopoverCloseTransitionTests.swift */,
@@ -313,6 +331,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD0000000000000000000002 /* AudioPlaybackPolicy.swift in Sources */,
+				B4112D440E158970C72B2827 /* PeakLimiter.swift in Sources */,
+				C2D561EC3CFCD0AE771CFD2C /* AudioFeaturePolicy.swift in Sources */,
+				ABF5C562DD7E3ED0EB0545B9 /* MediaKeyVolumeController.swift in Sources */,
 				34B0C83CDB0A12FD89A6DADC /* AudioApp.swift in Sources */,
 				3569B0B1D76F364A9E136AB6 /* AudioDevice.swift in Sources */,
 				6325EAF668E5B12240162955 /* AudioDeviceMonitor.swift in Sources */,
@@ -350,6 +372,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD0000000000000000000003 /* AudioPlaybackPolicy.swift in Sources */,
+				25BD4035B266FF58C19CA176 /* PeakLimiter.swift in Sources */,
+				5082332AC817AEF1A1BD0842 /* AudioFeaturePolicy.swift in Sources */,
+				8264C8874DE0431BB4CCB998 /* AudioFeatureTests.swift in Sources */,
 				B34A481616EF9CDE83C8899D /* AudioApp.swift in Sources */,
 				0C7E71EC042E6D0483732942 /* AudioAppTests.swift in Sources */,
 				EDFD3502FC2912EAEED5D4E2 /* AudioDevice.swift in Sources */,
@@ -476,7 +502,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -497,7 +523,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.5;
+				MARKETING_VERSION = 0.1.6;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -562,7 +588,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -577,7 +603,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.5;
+				MARKETING_VERSION = 0.1.6;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

@@ -11,7 +11,8 @@ struct VolumeTaperTests {
     @Test("clamps out-of-range positions")
     func clamps() {
         #expect(VolumeTaper.gain(position: -0.5) == 0)
-        #expect(VolumeTaper.gain(position: 2) == 1)
+        #expect(VolumeTaper.gain(position: 3) == 2)
+        #expect(VolumeTaper.gain(position: .nan) == 1)
     }
 
     @Test("midpoint sits well below linear −6 dB so the bottom of the travel breathes")
@@ -28,5 +29,12 @@ struct VolumeTaperTests {
             #expect(gain > previous)
             previous = gain
         }
+    }
+
+    @Test("boost preserves unity and uses amplitude gain above 100 percent")
+    func boostGain() {
+        #expect(VolumeTaper.gain(position: 1.84) == 1.84)
+        #expect(VolumeTaper.gain(position: 2) == 2)
+        #expect(VolumeTaper.gain(position: 0.75) == 0.421875)
     }
 }

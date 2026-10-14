@@ -13,6 +13,12 @@ struct AppVolume: Codable, Equatable {
     /// path does not need a tap.
     var isNeutral: Bool { volume == 1.0 && !isMuted && outputDeviceUIDs.isEmpty }
 
+    func resettingLevel(to value: Float) -> AppVolume {
+        var next = self
+        next.volume = VolumeTaper.clampedPosition(value)
+        return next
+    }
+
     /// An app's output choice is independent of its volume and mute settings.
     /// A single selection replaces the previous route, rather than duplicating
     /// that app onto every device selected in the past.
@@ -23,7 +29,7 @@ struct AppVolume: Codable, Equatable {
     }
 
     init(volume: Float = 1.0, isMuted: Bool = false, outputDeviceUIDs: [String] = []) {
-        self.volume = volume
+        self.volume = VolumeTaper.clampedPosition(volume)
         self.isMuted = isMuted
         self.outputDeviceUIDs = outputDeviceUIDs
     }
@@ -37,7 +43,7 @@ struct AppVolume: Codable, Equatable {
     /// decode and every saved volume would be lost on upgrade.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        volume = try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0
+        volume = VolumeTaper.clampedPosition(try container.decodeIfPresent(Float.self, forKey: .volume) ?? 1.0)
         isMuted = try container.decodeIfPresent(Bool.self, forKey: .isMuted) ?? false
         if let list = try container.decodeIfPresent([String].self, forKey: .outputDeviceUIDs) {
             outputDeviceUIDs = list

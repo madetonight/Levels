@@ -11,6 +11,7 @@ struct AudioApp: Identifiable, Hashable {
     let objectIDs: [AudioObjectID]
     let isPlaying: Bool
     let isRecording: Bool
+    var isPlaybackMeasured: Bool = false
 
     /// App icon resolved through NSRunningApplication; cheap, AppKit caches it.
     @MainActor
@@ -52,7 +53,8 @@ extension AudioApp {
                 name: representative.name,
                 objectIDs: Array(Set(existing.objectIDs + app.objectIDs)).sorted(),
                 isPlaying: existing.isPlaying || app.isPlaying,
-                isRecording: existing.isRecording || app.isRecording
+                isRecording: existing.isRecording || app.isRecording,
+                isPlaybackMeasured: existing.isPlaybackMeasured && app.isPlaybackMeasured
             )
         }
         return result

@@ -12,7 +12,7 @@ final class MixerEngine {
     private static let logger = Logger(subsystem: "com.joseluna.levels", category: "MixerEngine")
 
     let processMonitor = AudioProcessMonitor()
-    let systemVolume = SystemVolumeController()
+    let systemVolume: SystemVolumeController
     let deviceMonitor = AudioDeviceMonitor()
     let inputVolume = SystemVolumeController(direction: .input)
     let inputDeviceMonitor = AudioDeviceMonitor(direction: .input)
@@ -28,6 +28,10 @@ final class MixerEngine {
     private(set) var isStarted = false
 
     private(set) var volumes: [String: AppVolume] = [:]
+    private(set) var keepMacMicrophone: Bool
+    private(set) var appResetLevel: Float
+    @ObservationIgnored lazy var volumeKeys = MediaKeyVolumeController(volume: systemVolume)
+    @ObservationIgnored private let featurePreferences: AudioFeaturePreferences
 
     @ObservationIgnored let tapLifecycle = AudioTapLifecycle<ProcessTap>()
     private var taps: [String: ProcessTap] {
@@ -38,7 +42,7 @@ final class MixerEngine {
     /// One volume control per pinned-and-present device, keyed by UID — each
     /// routed output gets its own slider, like multi-output members.
     @ObservationIgnored private var routeVolumes: [String: DeviceVolumeController] = [:]
-    @ObservationIgnored private let store = VolumeStore()
+    @ObservationIgnored private let store: VolumeStore
     @ObservationIgnored private var deviceListener: HALListener?
     @ObservationIgnored private var serviceRestartListener: HALListener?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
@@ -46,6 +50,14 @@ final class MixerEngine {
     @ObservationIgnored var bluetoothRefreshTask: Task<Void, Never>?
     @ObservationIgnored var wakeResyncTask: Task<Void, Never>?
     @ObservationIgnored private var powerMonitor: AudioPowerMonitor?
+
+    init(defaults: UserDefaults = .standard) {
+        systemVolume = SystemVolumeController(defaults: defaults)
+        store = VolumeStore(defaults: defaults)
+        featurePreferences = AudioFeaturePreferences(defaults: defaults)
+        keepMacMicrophone = featurePreferences.keepMacMicrophone
+        appResetLevel = featurePreferences.appResetLevel
+    }
 
     #if RENDER_SHOTS
         /// Render harness only: mark the engine started and publish per-app
@@ -59,8 +71,32 @@ final class MixerEngine {
         }
     #endif
 
+    func setAppResetLevel(_ level: Float) {
+        appResetLevel = VolumeTaper.clampedPosition(level)
+        featurePreferences.appResetLevel = appResetLevel
+    }
+
+    func resetLevel(for app: AudioApp) {
+        apply(volume(for: app).resettingLevel(to: appResetLevel), to: app)
+    }
+
+    func setKeepMacMicrophone(_ enabled: Bool) {
+        keepMacMicrophone = enabled
+        featurePreferences.keepMacMicrophone = enabled
+        if isStarted { updatePreferredMicrophone() }
+    }
+
+    /// An explicit Bluetooth mic choice in Levels turns off automatic mic
+    /// preference. A selected USB/interface mic remains selected as well.
+    func selectInput(_ device: AudioDevice) {
+        if inputDeviceMonitor.setDefault(device), device.isBluetooth {
+            setKeepMacMicrophone(false)
+        }
+    }
+
     func start() {
         volumes = store.load()
+        processMonitor.signalSource = { [weak self] id in self?.taps[id]?.activity }
         processMonitor.start()
         systemVolume.start()
         deviceMonitor.start()
@@ -68,11 +104,15 @@ final class MixerEngine {
         inputDeviceMonitor.start()
         multiOutput.start()
         bluetooth.refresh()
+        systemVolume.onSoftwareChange = { [weak self] in self?.syncTaps() }
+        volumeKeys.start()
 
         installHALListeners()
 
         observeApps()
         observeDevices()
+        observeInputDevices()
+        updatePreferredMicrophone()
         powerMonitor = AudioPowerMonitor(
             onSleep: { [weak self] in self?.prepareForSleep() },
             onWake: { [weak self] in self?.recoverAfterWake() }
@@ -97,6 +137,7 @@ final class MixerEngine {
         needsAudioCapturePermission = false
         saveTask?.cancel()
         store.save(volumes)
+        syncTaps()
     }
 
     func volume(for app: AudioApp) -> AppVolume {
@@ -105,7 +146,7 @@ final class MixerEngine {
 
     func setVolume(_ value: Float, for app: AudioApp) {
         var entry = volumes[app.bundleID] ?? AppVolume()
-        entry.volume = max(0, min(1, value))
+        entry.volume = VolumeTaper.clampedPosition(value)
         apply(entry, to: app)
     }
 
@@ -136,6 +177,7 @@ final class MixerEngine {
         if let tap = taps.removeValue(forKey: app.bundleID) {
             tap.invalidate()
         }
+        syncTaps()
     }
 
     /// Smooths the volume jump when Fader exits. A tap mutes the app's native
@@ -147,12 +189,15 @@ final class MixerEngine {
     /// the level it is about to play, a smooth rise instead of a slam. Muted
     /// taps render silence and can't fade audibly, so they restore as-is.
     func fadeOutAndStop() {
+        volumeKeys.suspend()
+        processMonitor.setMeteringVisible(false)
         saveTask?.cancel()
         store.save(volumes)
-        let fading = taps.values.filter { !$0.isMuted && $0.volume < 0.999 }
+        let fading = taps.values.filter { !$0.isMuted && ($0.volume != 1 || $0.outputGain < 0.999) }
         if !fading.isEmpty {
             for tap in fading {
                 tap.volume = 1.0
+                tap.outputGain = 1
             }
             // ~5× the 30 ms gain ramp: long enough for the rendered level to
             // reach unity before teardown un-mutes the native output. Blocking
@@ -201,12 +246,14 @@ final class MixerEngine {
         // refresh the paired list so the disconnected section tracks reality.
         withObservationTracking {
             _ = deviceMonitor.devices
+            _ = deviceMonitor.defaultDeviceID
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
                 self.refreshBluetoothSoon()
                 self.multiOutput.handleDevicesChanged(present: self.deviceMonitor.devices)
                 self.reconcileTapRouting()
+                self.updatePreferredMicrophone()
                 self.observeDevices()
             }
         }
@@ -216,7 +263,24 @@ final class MixerEngine {
         volumes[app.bundleID] = entry
         scheduleSave()
 
-        if entry.isNeutral {
+        applyTapState(for: app, entry: entry)
+    }
+
+    private func softwareLevel(for entry: AppVolume) -> SoftwareOutputLevel {
+        guard !multiOutput.isActive else { return SoftwareOutputLevel() }
+        let devices = entry.outputDeviceUIDs.compactMap { uid in deviceMonitor.devices.first { $0.uid == uid } }
+        // Older multi-route entries are retained; one gain cannot represent
+        // several independently controlled devices in a stacked aggregate.
+        guard devices.count <= 1 else { return SoftwareOutputLevel() }
+        guard let device = devices.first ?? deviceMonitor.devices.first(where: { $0.id == deviceMonitor.defaultDeviceID }) else { return SoftwareOutputLevel() }
+        return systemVolume.softwareLevel(for: device)
+    }
+
+    private func applyTapState(for app: AudioApp, entry: AppVolume) {
+        guard !tapLifecycle.isSleeping, !app.objectIDs.isEmpty else { return }
+        let output = softwareLevel(for: entry)
+        let control = TapControlState(app: entry, output: output)
+        if !control.requiresTap {
             // Unity returns to the app's original audio path immediately.
             taps.removeValue(forKey: app.bundleID)?.invalidate()
             tapErrors[app.bundleID] = nil
@@ -224,8 +288,9 @@ final class MixerEngine {
             needsAudioCapturePermission = !permissionDeniedApps.isEmpty
         } else if let tap = taps[app.bundleID] {
             tap.volume = entry.volume
-            tap.isMuted = entry.isMuted
-        } else if !entry.isNeutral {
+            tap.outputGain = control.outputGain
+            tap.isMuted = control.isMuted
+        } else {
             createTap(for: app, entry: entry)
         }
     }
@@ -260,9 +325,8 @@ final class MixerEngine {
                 taps[bundleID] = nil
             }
         }
-        for (bundleID, entry) in volumes where !entry.isNeutral {
-            guard taps[bundleID] == nil, let app = running[bundleID] else { continue }
-            createTap(for: app, entry: entry)
+        for (bundleID, app) in running {
+            applyTapState(for: app, entry: volumes[bundleID] ?? AppVolume())
         }
         syncRouteVolumes()
     }
@@ -301,10 +365,12 @@ final class MixerEngine {
         // still apply; changing a physical device's volume would affect other
         // apps using that device too.
         do {
+            let control = TapControlState(app: entry, output: softwareLevel(for: entry))
             let tap = ProcessTap(
                 processObjectIDs: app.objectIDs,
                 volume: entry.volume,
-                isMuted: entry.isMuted
+                isMuted: control.isMuted,
+                outputGain: control.outputGain
             )
             try tap.activate(outputs: outputs)
             tapLifecycle.install(tap, for: app.bundleID)
@@ -346,7 +412,7 @@ final class MixerEngine {
     func reconcileTapRouting() {
         guard !tapLifecycle.isSleeping else { return }
         for (bundleID, tap) in taps {
-            guard let entry = volumes[bundleID] else { continue }
+            let entry = volumes[bundleID] ?? AppVolume()
             if let desired = try? resolvedOutputs(for: entry),
                desired == tap.activatedOutputs, tap.isAlive { continue }
             tap.invalidate()
@@ -359,7 +425,7 @@ final class MixerEngine {
         if let tap = taps.removeValue(forKey: app.bundleID) {
             tap.invalidate()
         }
-        if !entry.isNeutral {
+        if !entry.isNeutral || !softwareLevel(for: entry).isNeutral {
             createTap(for: app, entry: entry)
         } else {
             tapErrors[app.bundleID] = nil
@@ -386,6 +452,7 @@ extension MixerEngine {
         volumes[app.bundleID] = entry.isNeutral ? nil : entry
         scheduleSave()
         rebuildTap(for: app, entry: entry)
+        updatePreferredMicrophone()
     }
 
     /// The UIDs an app is pinned to, present or not — drives the route chips.

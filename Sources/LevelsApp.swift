@@ -35,6 +35,14 @@ final class LevelsDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         ProcessInfo.processInfo.disableSuddenTermination()
         ProcessInfo.processInfo.disableAutomaticTermination("Levels menu bar app")
+        options.onShowSettings = { [weak self] in
+            guard let self else { return }
+            self.stopClickAwayMonitoring()
+            self.closeTransition.cancel()
+            self.popover.animates = false
+            self.popover.close()
+            self.endPresentationSession()
+        }
         options.updates.start()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.autosaveName = "LevelsMixer"
@@ -115,6 +123,7 @@ final class LevelsDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverDidShow(_ notification: Notification) {
+        engine.processMonitor.setMeteringVisible(true)
         stopClickAwayMonitoring()
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
             // AppKit delivers event monitors on the main thread. Handle the
@@ -179,6 +188,7 @@ final class LevelsDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        engine.processMonitor.setMeteringVisible(false)
         stopClickAwayMonitoring()
         closeTransition.cancel()
         endPresentationSession()

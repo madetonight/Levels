@@ -4,21 +4,21 @@ A native macOS menu bar volume mixer. Its audio engine is adapted from [Fader](h
 
 ## Try it
 
-Source, assets, tests, scripts, documentation, and distributable builds are maintained in this project. Download the [latest sample beta](https://github.com/madetonight/Levels/releases/tag/v0.1.5-beta), or build locally with the scripts below.
+Source, assets, tests, scripts, documentation, and distributable builds are maintained in this project. Download the [latest sample beta](https://github.com/madetonight/Levels/releases/tag/v0.1.6-beta), or build locally with the scripts below.
 
 Open `dist/Levels.app`. Left-click the three-fader icon in the menu bar to open the panel. Right-click that icon, or click the panel's top-right three-dot Options button, for the same appearance, surface, settings, and Quit menu.
 
 Levels stays in the menu bar. Launching or reopening the app does not open a window or activate a hidden item. Reveal it through your menu bar manager, then click its icon to open the mixer. On macOS 27 it uses AppKit's expanded-interface lifecycle; earlier systems use the classic button action. Keyboard navigation uses native controls.
 
-- **Output:** master volume, per-app volume/mute, and per-app output selectors are together here. Click the device name under Master Volume to change the Mac's default output. System default in an app's selector follows that device. Neutral idle apps are hidden by default; apps with adjusted volume, mute, or routing remain visible with their saved settings. Show inactive audio apps restores the full known list.
+- **Output:** master volume, per-app volume/mute, and per-app output selectors are together here. Choose the Mac's default output in Options → Settings → Devices. System default in an app's selector follows that device. Neutral idle apps are hidden by default; apps with adjusted volume, mute, or routing remain visible with their saved settings. Settings → Show inactive audio apps restores the full known list. Each app has a Reset button below its slider on the right; it restores the configurable default level (100% initially), preserving mute and output.
 - **Input:** select an input and adjust gain when supported by the hardware. Shows which apps are using the microphone.
-- **Settings:** choose Dark or Light followed by Solid or Liquid Glass in Appearance; optionally launch at login, show inactive audio apps, reset app volumes, or quit. Right-click an app row to reset only that app.
+- **Settings:** the dedicated Settings window holds device choices, login, inactive apps, optional monitor/Bluetooth features, default reset level, and volume reset. Appearance and Updates remain separate menu choices. Right-click an app row for reset actions.
 
 The compact 320 × 560-point mixer uses the approved sage and mint palette and real icons from each running app. The top-right three-dot Options button opens settings. Appearance offers Solid (the opaque textured background) and Liquid Glass (clear native glass on macOS 26+); the Output/Input bar follows the same surface choice. Dark/Light color and Solid/Liquid Glass material are independently selectable in one submenu. Existing System preferences continue following macOS until a color is chosen. The interface uses the default San Francisco system font. The reflective border applies to both surfaces. Reduced Transparency uses a solid background; earlier systems use a translucent material fallback for glass.
 
-macOS requires **System Audio Recording** permission when the first app volume is adjusted. Audio is processed on the Mac and is never recorded to disk or uploaded. If access is denied, the panel explains how to enable Levels in Privacy & Security and retry.
+macOS requires **System Audio Recording** permission for per-app processing and playback signal detection. Audio is processed on the Mac and is never recorded to disk or uploaded. If access is denied, the panel explains how to enable Levels in Privacy & Security and retry.
 
-Volume changes apply to the whole app, including its helper processes, rather than individual browser tabs. Output switching itself does not need audio recording permission. Devices that expose no software volume control have a disabled master slider with an explanation.
+Volume changes apply to the whole app, including its helper processes, rather than individual browser tabs. Output switching itself does not need audio recording permission. Fixed HDMI/DisplayPort devices can use optional software master volume enabled in Settings. Other devices without writable volume show a read-only explanation.
 
 For simultaneous playback on different devices, connect your headphones and start Spotify and a browser video. In Output, choose your headphones below Spotify's slider and MacBook Pro Speakers below the browser's slider. Per-app selection does not change the Mac's default output, and each app keeps its own level and mute control. Selecting System default restores normal output following. If a selected device disconnects, the app falls back to the current system output while remembering its selection. Per-app routing uses the same audio permission as per-app volume control. The user verified Spotify/headphone and browser/speaker simultaneous playback with independent volume and mute controls.
 
@@ -65,9 +65,15 @@ This preserves the regular development build, places the optimized app and ZIP i
 
 ## Downloadable beta
 
-[Download Levels 0.1.5 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.5-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
+[Download Levels 0.1.6 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.6-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
 
 Run `Scripts/package-beta.sh` to package the existing optimized app in `dist/Release/Levels.app` as a clearly labeled, unnotarized beta. After source changes, rebuild with `Scripts/package-dmg.sh` first. The beta DMG, app-only ZIP, portable checksums, release notes, and package measurements are kept in `dist/Beta/`. See BETA.md for publishing and installation validation.
+
+## Playback status
+
+While the mixer is visible, Levels reuses existing control taps or creates passive nonmuting taps to distinguish actual signal from a silent open stream. A 200 ms activity hold avoids flickering between audio buffers. No samples are retained. Passive taps are released when the mixer closes or the Mac sleeps; setup runs off the UI thread. If capture is unavailable, Output active reports the macOS stream flag without pretending it proves audible sound. Muted/zero-volume apps report Muted/Silent.
+
+Short pauses and audio-helper replacement retain a row for four seconds while its label updates immediately. Rows stay alphabetical. Cached rows never retain obsolete process object IDs; adjusted controls apply again when a new helper appears.
 
 ## Implementation
 

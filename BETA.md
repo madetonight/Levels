@@ -1,6 +1,6 @@
 # Zero-budget Levels beta
 
-The first downloadable beta is 0.1.5/build 6, Apple silicon, macOS 15+. It uses the verified optimized Release app, free ad-hoc signing, and no Apple notarization. Publishing this beta does not require paid Apple Developer membership. Self-signed or Sparkle update signatures do not create Gatekeeper trust.
+The current downloadable beta is 0.1.6/build 7, Apple silicon, macOS 15+. It uses the verified optimized Release app, free ad-hoc signing, and no Apple notarization. Publishing this beta does not require paid Apple Developer membership. Self-signed or Sparkle update signatures do not create Gatekeeper trust.
 
 ## Build and package
 
@@ -10,11 +10,11 @@ The output in dist/Beta contains the drag-to-Applications DMG, app-only ZIP, SHA
 
 ## Published release
 
-The updated sample is prepared as v0.1.5-beta. Publish its verified DMG, ZIP, and checksums at https://github.com/madetonight/Levels/releases/tag/v0.1.5-beta. No signing key or credential belongs in the repository.
+The updated sample is prepared as v0.1.6-beta. Publish its verified DMG, ZIP, and checksums at https://github.com/madetonight/Levels/releases/tag/v0.1.6-beta. No signing key or credential belongs in the repository.
 
 For subsequent releases:
 
-Use the public `madetonight/Levels` repository. Create a GitHub release tagged `v0.1.5-beta`, title `Levels 0.1.5 beta`, and mark it as a pre-release. Use dist/Beta/RELEASE-NOTES.md for the description. Upload the DMG, optional ZIP, and SHA256SUMS.txt. Publishing binaries does not require uploading local source or developer credentials. Keep the beta label and unnotarized-install notice visible next to the download.
+Use the public `madetonight/Levels` repository. Create a GitHub release tagged `v0.1.6-beta`, title `Levels 0.1.6 beta`, and mark it as a pre-release. Use dist/Beta/RELEASE-NOTES.md for the description. Upload the DMG, optional ZIP, and SHA256SUMS.txt. Publishing binaries does not require uploading local source or developer credentials. Keep the beta label and unnotarized-install notice visible next to the download.
 
 ## Verify a fresh installation
 

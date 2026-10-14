@@ -46,6 +46,9 @@ final class MixerOptions: NSObject {
         didSet { defaults.set(showIdleApps, forKey: "LevelsShowInactiveAudioApps") }
     }
     var settingsError: String?
+    var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @ObservationIgnored private var settingsWindow: NSWindow?
+    @ObservationIgnored var onShowSettings: (() -> Void)?
 
     init(engine: MixerEngine, defaults: UserDefaults = .standard) {
         self.engine = engine
@@ -78,10 +81,8 @@ final class MixerOptions: NSObject {
         let appearanceItem = menu.addItem(withTitle: "Appearance", action: nil, keyEquivalent: "")
         appearanceItem.submenu = appearances
         menu.addItem(.separator())
-        add("Launch at login", to: menu, action: #selector(toggleLogin), checked: SMAppService.mainApp.status == .enabled)
-        add("Show inactive audio apps", to: menu, action: #selector(toggleInactiveApps), checked: showIdleApps)
+        add("Settings…", to: menu, action: #selector(showSettings), key: ",")
         menu.addItem(.separator())
-        add("Reset all app volumes…", to: menu, action: #selector(confirmReset))
         let updatesMenu = NSMenu(title: "Updates")
         updatesMenu.autoenablesItems = false
         add("Check for Updates…", to: updatesMenu, action: #selector(checkForUpdates))
@@ -118,21 +119,50 @@ final class MixerOptions: NSObject {
         surface = choice
     }
 
-    @objc private func toggleInactiveApps() { showIdleApps.toggle() }
+    @objc func showSettings() {
+        onShowSettings?()
+        let window = prepareSettingsWindow()
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+        NSApp.activate(ignoringOtherApps: true)
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    /// Creating the settings window does not show it; only showSettings does.
+    func prepareSettingsWindow() -> NSWindow {
+        if let settingsWindow { return settingsWindow }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 580),
+            styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+        window.title = "Levels Settings"
+        window.isReleasedWhenClosed = false
+        window.tabbingMode = .disallowed
+        window.contentViewController = NSHostingController(rootView: settingsContent)
+        window.setContentSize(NSSize(width: 480, height: 580))
+        if !window.setFrameUsingName("LevelsSettingsWindow") { window.center() }
+        window.setFrameAutosaveName("LevelsSettingsWindow")
+        settingsWindow = window
+        return window
+    }
+
+    var settingsContent: some View {
+        LevelsSettingsView().environment(engine).environment(self)
+    }
+
     @objc private func checkForUpdates() { updates.checkForUpdates() }
     @objc private func toggleAutomaticUpdates() { updates.setAutomaticChecks(!updates.automaticallyChecks) }
 
-    @objc private func toggleLogin() {
+    func setLaunchAtLogin(_ enabled: Bool) {
         do {
-            if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
-            else { try SMAppService.mainApp.register() }
+            if enabled { try SMAppService.mainApp.register() }
+            else { try SMAppService.mainApp.unregister() }
+            launchAtLogin = SMAppService.mainApp.status == .enabled
             settingsError = nil
         } catch {
             settingsError = "Couldn’t change launch at login. Try again in System Settings."
         }
     }
 
-    @objc private func confirmReset() {
+    func confirmReset() {
         let alert = NSAlert()
         alert.messageText = "Reset all app volumes?"
         alert.informativeText = "Apps will return to their original volume. Muted apps may become audible."
@@ -151,6 +181,90 @@ final class MixerOptions: NSObject {
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
+}
+
+/// Standard Mac preferences, opened on demand from either Options entry point.
+private struct LevelsSettingsView: View {
+    @Environment(MixerEngine.self) private var engine
+    @Environment(MixerOptions.self) private var options
+
+    var body: some View {
+        Form {
+            Section("General") {
+                Toggle("Launch at login", isOn: Binding(get: { options.launchAtLogin },
+                    set: { options.setLaunchAtLogin($0) }))
+                Toggle("Show inactive audio apps", isOn: Binding(get: { options.showIdleApps },
+                    set: { options.showIdleApps = $0 }))
+            }
+            Section("Devices") {
+                devicePicker(engine.deviceMonitor, title: "Output device")
+                Toggle("Mute output", isOn: muteBinding(engine.systemVolume))
+                    .disabled(!engine.isStarted || !engine.systemVolume.canMute)
+                devicePicker(engine.inputDeviceMonitor, title: "Input device")
+                Toggle("Mute microphone", isOn: muteBinding(engine.inputVolume))
+                    .disabled(!engine.isStarted || !engine.inputVolume.canMute)
+            }
+            Section("Audio") {
+                Toggle("Software volume for HDMI / DisplayPort", isOn: Binding(
+                    get: { engine.systemVolume.softwareEnabled },
+                    set: { engine.systemVolume.setSoftwareEnabled($0) }))
+                Text("Use Levels to adjust fixed-volume monitor outputs. Levels must stay running.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Keep Mac microphone with Bluetooth", isOn: Binding(
+                    get: { engine.keepMacMicrophone }, set: { engine.setKeepMacMicrophone($0) }))
+                Text("Prefer the Mac microphone to avoid headset call mode. A selected USB microphone stays selected.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if engine.volumeKeys.needsPermission {
+                    Button("Enable volume keys…") { engine.volumeKeys.requestPermission() }
+                    Text("Allow Levels in Accessibility to use volume keys with a fixed-volume monitor.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if engine.volumeKeys.unavailable {
+                    Text("Volume keys are unavailable. The master slider still works.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Section("App volumes") {
+                HStack {
+                    Text("Default reset level")
+                    Spacer()
+                    Text("\(Int((engine.appResetLevel * 100).rounded()))%")
+                        .monospacedDigit().foregroundStyle(.secondary)
+                }
+                Slider(value: Binding(get: { Double(engine.appResetLevel) },
+                    set: { engine.setAppResetLevel(Float($0)) }), in: 0...2, step: 0.01)
+                    .accessibilityLabel("Default app reset level")
+                Text("Each app's Reset button restores this level, keeping its mute and output. The default is 100%.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Reset all app volumes…") { options.confirmReset() }
+                Text("Restore original app levels, mute states, and output routes.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let error = options.settingsError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+        }
+        .formStyle(.grouped).padding(12)
+        .fontDesign(.default)
+        .frame(width: 480, height: 580)
+        .preferredColorScheme(options.appearance.colorScheme)
+    }
+
+    private func muteBinding(_ controller: SystemVolumeController) -> Binding<Bool> {
+        Binding(get: { controller.isMuted }, set: { value in
+            if value != controller.isMuted { controller.toggleMute() }
+        })
+    }
+
+    private func devicePicker(_ monitor: AudioDeviceMonitor, title: String) -> some View {
+        Picker(title, selection: Binding(get: { monitor.defaultDeviceID }, set: { id in
+            guard let device = monitor.devices.first(where: { $0.id == id }) else { return }
+            if monitor.direction == .input { engine.selectInput(device) }
+            else { monitor.setDefault(device) }
+        })) {
+            if monitor.devices.isEmpty { Text("No device available").tag(monitor.defaultDeviceID) }
+            ForEach(monitor.devices) { device in Text(device.name).tag(device.id) }
+        }.disabled(!engine.isStarted || monitor.devices.isEmpty)
+    }
 }
 
 private struct MixerOptionsButton: NSViewRepresentable {
@@ -222,9 +336,8 @@ struct MixerView: View {
 
     private var apps: [AudioApp] {
         engine.processMonitor.apps.filter {
-            options.showIdleApps || $0.isPlaying || !engine.volume(for: $0).isNeutral
+            options.showIdleApps || $0.isPlaying || engine.processMonitor.recentlyPlaying.contains($0.bundleID) || !engine.volume(for: $0).isNeutral
         }.sorted { lhs, rhs in
-            if lhs.isPlaying != rhs.isPlaying { return lhs.isPlaying }
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
     }
@@ -279,7 +392,6 @@ struct MixerView: View {
             header.padding(.bottom, 14)
             tabs.padding(.bottom, 16)
             systemCard.padding(.bottom, 14)
-            Rectangle().fill(palette.line).frame(height: 1).padding(.bottom, 12)
             Group {
                 if !engine.isStarted {
                     emptyState("Connecting to audio", subtitle: "Waiting for the Mac’s audio system…", icon: "waveform")
@@ -327,12 +439,13 @@ struct MixerView: View {
                     HStack(spacing: 8) {
                         Image(systemName: tab == .input ? "mic" : "hifispeaker")
                             .font(.system(size: 15)).accessibilityHidden(true)
-                        if tab == .outputs {
-                            masterOutputSelector
-                        } else {
-                            Text(controller.deviceName.isEmpty ? "No device available" : controller.deviceName)
-                                .font(.system(size: 12, weight: .medium)).lineLimit(1)
-                        }
+                        Text(controller.deviceName.isEmpty ? "No device available" : controller.deviceName)
+                            .font(.system(size: 12, weight: .medium)).lineLimit(1)
+                            .contextMenu {
+                                Button(controller.isMuted ? "Unmute device" : "Mute device") { controller.toggleMute() }
+                                    .disabled(!controller.canMute || !engine.isStarted)
+                            }
+                            .help("Device selection and mute controls are in Settings.")
                     }
                 }
                 Spacer(minLength: 4)
@@ -342,60 +455,15 @@ struct MixerView: View {
                     Text("%").font(.system(size: 12))
                 }.monospacedDigit().foregroundStyle(controller.isMuted ? palette.secondary : palette.text)
             }
-            HStack(spacing: 10) {
-                Button { controller.toggleMute() } label: {
-                    Image(systemName: tab == .input
-                          ? (controller.isMuted ? "mic.slash" : "mic")
-                          : (controller.isMuted ? "speaker.slash" : "speaker.wave.1"))
-                        .font(.system(size: 16)).frame(width: 26, height: 26)
-                        .background(controller.isMuted ? palette.button : .clear, in: RoundedRectangle(cornerRadius: 7))
-                }
-                .buttonStyle(.plain).foregroundStyle(palette.secondary)
-                .disabled(!controller.canMute || !engine.isStarted)
-                .accessibilityLabel(controller.isMuted ? "Unmute device" : "Mute device")
-                MixerVolumeSlider(value: Binding(get: { controller.volume }, set: { controller.setVolume($0) }),
-                                  palette: palette, label: tab == .input ? "Microphone gain" : "Master volume")
-                    .disabled(!controller.canSetVolume || !engine.isStarted)
-                    .opacity(controller.isMuted ? 0.5 : 1)
-                Image(systemName: tab == .input ? "mic" : "speaker.wave.3")
-                    .font(.system(size: 16)).foregroundStyle(palette.secondary).accessibilityHidden(true)
-            }
+            MixerVolumeSlider(value: Binding(get: { controller.volume }, set: { controller.setVolume($0) }),
+                              palette: palette, label: tab == .input ? "Microphone gain" : "Master volume")
+                .disabled(!controller.canSetVolume || !engine.isStarted)
+                .opacity(controller.isMuted ? 0.5 : 1)
             if engine.isStarted, !controller.canSetVolume {
                 Text("Volume is controlled on this device.")
                     .font(.system(size: 10)).foregroundStyle(palette.secondary)
             }
         }
-    }
-
-    private var masterOutputSelector: some View {
-        let monitor = engine.deviceMonitor
-        return Menu {
-            Picker("Output device", selection: Binding(
-                get: { monitor.defaultDeviceID },
-                set: { id in
-                    if let device = monitor.devices.first(where: { $0.id == id }) {
-                        monitor.setDefault(device)
-                    }
-                }
-            )) {
-                ForEach(monitor.devices) { device in
-                    Text(device.name).tag(device.id)
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Text(engine.systemVolume.deviceName.isEmpty ? "No device available" : engine.systemVolume.deviceName)
-                    .font(.system(size: 12, weight: .medium)).lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(palette.secondary)
-            }
-            .foregroundStyle(palette.text)
-        }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden)
-        .disabled(!engine.isStarted || monitor.devices.isEmpty)
-        .accessibilityLabel("Master output device")
-        .help("Choose the Mac’s default output device")
     }
 
     private var tabs: some View {
@@ -462,11 +530,6 @@ struct MixerView: View {
 
     private var appControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Spacer()
-                Text("\(apps.count) \(apps.count == 1 ? "app" : "apps")")
-                    .font(.system(size: 11)).foregroundStyle(palette.secondary)
-            }
             if engine.multiOutput.isActive {
                 emptyState("Multiple outputs active", subtitle: "Per-app volume resumes when you return to a single output.", icon: "speaker.wave.2")
             } else if apps.isEmpty {
@@ -475,7 +538,7 @@ struct MixerView: View {
                            icon: "waveform")
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: 12) {
                         ForEach(apps, id: \.bundleID) { app in AppLevelRow(app: app, palette: palette) }
                     }.padding(.vertical, 1)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -502,7 +565,10 @@ struct MixerView: View {
     private func deviceRows(_ monitor: AudioDeviceMonitor) -> some View {
         VStack(spacing: 6) {
             ForEach(monitor.devices) { device in
-                Button { monitor.setDefault(device) } label: {
+                Button {
+                    if monitor.direction == .input { engine.selectInput(device) }
+                    else { monitor.setDefault(device) }
+                } label: {
                     HStack(spacing: 10) {
                         Image(systemName: device.isBluetooth ? "headphones" : (monitor.direction == .input ? "mic.fill" : "speaker.wave.2.fill"))
                             .foregroundStyle(palette.fill).frame(width: 26)
@@ -605,13 +671,13 @@ private struct AppLevelRow: View {
                     Text(app.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
                     HStack(spacing: 5) {
                         Circle().fill(palette.fill.opacity(volume.isMuted ? 0.35 : 0.65)).frame(width: 4, height: 4)
-                        Text(error != nil ? "Not applied · retry or reset" : (volume.isMuted ? "Muted" : (app.isPlaying ? "Playing" : "Idle · level remembered")))
+                        Text(error != nil ? "Not applied · retry or reset" : (volume.isMuted ? "Muted" : (volume.volume == 0 ? "Silent" : (app.isPlaying ? (app.isPlaybackMeasured ? "Playing" : "Output active") : "Idle"))))
                             .font(.system(size: 10)).foregroundStyle(error != nil ? Color.orange : palette.secondary)
                     }
                 }
                 Spacer(minLength: 3)
                 Text("\(Int((volume.volume * 100).rounded()))%")
-                    .font(.system(size: 12, weight: .medium)).monospacedDigit().foregroundStyle(palette.secondary)
+                    .font(.system(size: 12, weight: .medium)).monospacedDigit().foregroundStyle(volume.volume > 1 ? Color.orange : palette.secondary)
                 Button { engine.toggleMute(for: app) } label: {
                     Image(systemName: volume.isMuted ? "speaker.slash" : "speaker.wave.2")
                         .font(.system(size: 13)).frame(width: 24, height: 24)
@@ -621,17 +687,27 @@ private struct AppLevelRow: View {
                 .accessibilityLabel("\(volume.isMuted ? "Unmute" : "Mute") \(app.name)")
             }
             MixerVolumeSlider(value: Binding(get: { engine.volume(for: app).volume }, set: { engine.setVolume($0, for: app) }),
-                              palette: palette, label: "\(app.name) volume")
+                              palette: palette, label: "\(app.name) volume", maximum: VolumeTaper.maximumPosition)
                 .padding(.leading, 33).opacity(volume.isMuted ? 0.5 : 1)
-            outputSelector.padding(.leading, 33)
+                .help("0–200%. Boost above 100% uses a peak limiter to prevent digital clipping.")
+            HStack(spacing: 6) {
+                outputSelector
+                Button("Reset") { engine.resetLevel(for: app) }
+                    .buttonStyle(.plain).font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(palette.secondary)
+                    .padding(.horizontal, 7).padding(.vertical, 4)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Reset \(app.name) to \(Int((engine.appResetLevel * 100).rounded())) percent")
+                    .help("Restore this app's level to \(Int((engine.appResetLevel * 100).rounded()))%. Mute and output stay unchanged.")
+            }.padding(.leading, 33)
             if let error, !engine.needsAudioCapturePermission {
                 Text(error).font(.system(size: 10)).foregroundStyle(.orange).lineLimit(2)
             }
-            Rectangle().fill(palette.line).frame(height: 1).padding(.top, 6)
         }
          .padding(.top, 10)
         .contextMenu {
-            Button("Reset \(app.name) to 100%") { engine.reset(app) }
+            Button("Reset level to \(Int((engine.appResetLevel * 100).rounded()))%") { engine.resetLevel(for: app) }
+            Button("Restore original volume and output") { engine.reset(app) }
         }
     }
 
@@ -672,15 +748,17 @@ private struct MixerVolumeSlider: NSViewRepresentable {
     @Binding var value: Float
     let palette: MixerPalette
     let label: String
+    var maximum: Float = 1
     @Environment(\.isEnabled) private var isEnabled
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSSlider {
-        let slider = NSSlider(value: Double(value), minValue: 0, maxValue: 1,
+        let slider = NSSlider(value: Double(value), minValue: 0, maxValue: Double(maximum),
                               target: context.coordinator, action: #selector(Coordinator.changed(_:)))
         slider.cell = SageSliderCell()
         slider.minValue = 0
-        slider.maxValue = 1
+        slider.maxValue = Double(maximum)
+        slider.altIncrementValue = 0.01
         slider.isContinuous = true
         slider.target = context.coordinator
         slider.action = #selector(Coordinator.changed(_:))
@@ -690,9 +768,11 @@ private struct MixerVolumeSlider: NSViewRepresentable {
     }
     func updateNSView(_ slider: NSSlider, context: Context) {
         context.coordinator.parent = self
+        slider.maxValue = Double(maximum)
         if slider.floatValue != value { slider.floatValue = value }
         if slider.isEnabled != isEnabled { slider.isEnabled = isEnabled }
         slider.setAccessibilityLabel(label)
+        slider.setAccessibilityValueDescription("\(Int((value * 100).rounded())) percent\(value > 1 ? ", boost with limiter" : "")")
         if let cell = slider.cell as? SageSliderCell {
             let track = NSColor(palette.track), fill = NSColor(palette.fill), thumb = NSColor(palette.thumb)
             if cell.track != track || cell.fill != fill || cell.thumb != thumb {
@@ -709,7 +789,10 @@ private struct MixerVolumeSlider: NSViewRepresentable {
     @MainActor final class Coordinator: NSObject {
         var parent: MixerVolumeSlider
         init(_ parent: MixerVolumeSlider) { self.parent = parent }
-        @objc func changed(_ slider: NSSlider) { parent.value = slider.floatValue }
+        @objc func changed(_ slider: NSSlider) {
+            let value = slider.floatValue
+            parent.value = parent.maximum > 1 && abs(value - 1) < 0.015 ? 1 : value
+        }
     }
     final class SageSliderCell: NSSliderCell {
         var track = NSColor.gray
@@ -723,6 +806,16 @@ private struct MixerVolumeSlider: NSViewRepresentable {
             let filled = NSRect(x: bar.minX, y: bar.minY, width: bar.width * min(1, max(0, progress)), height: bar.height)
             (isEnabled ? fill : fill.withAlphaComponent(0.35)).setFill()
             NSBezierPath(roundedRect: filled, xRadius: 2.5, yRadius: 2.5).fill()
+            if maxValue > 1 {
+                let unityX = bar.minX + bar.width * CGFloat((1 - minValue) / (maxValue - minValue))
+                if doubleValue > 1 {
+                    NSColor.systemOrange.withAlphaComponent(isEnabled ? 1 : 0.35).setFill()
+                    NSBezierPath(roundedRect: NSRect(x: unityX, y: bar.minY,
+                        width: max(0, filled.maxX - unityX), height: bar.height), xRadius: 2.5, yRadius: 2.5).fill()
+                }
+                fill.withAlphaComponent(0.65).setFill()
+                NSBezierPath(rect: NSRect(x: unityX - 0.5, y: bar.minY - 3, width: 1, height: 11)).fill()
+            }
         }
         override func knobRect(flipped: Bool) -> NSRect {
             let native = super.knobRect(flipped: flipped)

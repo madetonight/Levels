@@ -87,14 +87,17 @@ final class AudioDeviceMonitor {
         ]
     }
 
-    func setDefault(_ device: AudioDevice) {
+    @discardableResult
+    func setDefault(_ device: AudioDevice) -> Bool {
         do {
             try AudioObjectID.system.write(direction.defaultDeviceSelector, value: device.id)
             defaultDeviceID = device.id
             selectionError = nil
+            return true
         } catch {
             selectionError = "Couldn’t switch to \(device.name). It may have disconnected."
             Self.logger.error("Failed to set default device to \(device.name): \(error.localizedDescription)")
+            return false
         }
     }
 
