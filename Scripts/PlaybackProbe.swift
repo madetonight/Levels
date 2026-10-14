@@ -8,6 +8,7 @@ import Synchronization
     @MainActor static func main() throws {
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.finishLaunching()
+        let continuous = CommandLine.arguments.contains("--continuous")
         let engine = AVAudioEngine()
         let format = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2)!
         let beginning = Atomic<UInt64>(0)
@@ -15,7 +16,7 @@ import Synchronization
             let base = beginning.load(ordering: .relaxed)
             let now = DispatchTime.now().uptimeNanoseconds
             let elapsed = base == 0 ? 0 : Double(now - base) / 1_000_000_000
-            let tone = elapsed < 4 || elapsed >= 7
+            let tone = continuous || elapsed < 4 || elapsed >= 7
             let data = UnsafeMutableAudioBufferListPointer(buffers)
             for frame in 0..<Int(frames) {
                 let sample = tone ? Float(sin((time.pointee.mSampleTime + Double(frame)) * 2 * .pi * 440 / 48000)) * 0.002 : 0
@@ -29,7 +30,7 @@ import Synchronization
         engine.connect(node, to: engine.mainMixerNode, format: format)
         try engine.start()
         beginning.store(DispatchTime.now().uptimeNanoseconds, ordering: .relaxed)
-        let finish = ProcessInfo.processInfo.systemUptime + 10
+        let finish = ProcessInfo.processInfo.systemUptime + (continuous ? 25 : 10)
         print("Probe started", ProcessInfo.processInfo.systemUptime)
         fflush(stdout)
         while ProcessInfo.processInfo.systemUptime < finish {

@@ -80,3 +80,13 @@ struct OutputAppSections {
         other = sorted.filter { !isPrimary($0) }
     }
 }
+
+/// A live HAL object is insufficient: IO must continue delivering usable buffers.
+/// No signal requirement here: an idle or intentionally muted stream is valid.
+enum TapHandoffPolicy {
+    static let timeout: UInt64 = 2_000_000_000
+    static func isStalled(now: UInt64, activatedAt: UInt64, lastCallback: UInt64) -> Bool {
+        let reference = lastCallback == 0 ? activatedAt : lastCallback
+        return now >= reference && now - reference > timeout
+    }
+}

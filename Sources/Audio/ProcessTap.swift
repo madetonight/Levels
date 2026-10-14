@@ -2,6 +2,7 @@ import AudioToolbox
 import CoreAudio
 import Foundation
 import os
+import Synchronization
 
 /// Owns the Core Audio plumbing that gives Fader control over one app's volume:
 /// a process tap that mutes the app's native output, an aggregate device wrapping
@@ -13,6 +14,12 @@ import os
 final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
     let activity = AudioSignalActivity()
     private let monitorOnly: Bool
+    private let intercepting = Atomic<Bool>(false)
+    private let lastCallback = Atomic<UInt64>(0)
+    private let readyToHandoff = Atomic<Bool>(false)
+    private var activatedAt: UInt64 = 0
+    @MainActor private var handoffTask: Task<Void, Never>?
+
     static let logger = Logger(subsystem: "com.joseluna.levels", category: "ProcessTap")
     /// Fader never needs exclusive hardware access, and its audio IO must not
     /// keep the CPU awake while the rest of the machine is idle.
@@ -22,6 +29,13 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
     }
 
     #if RENDER_SHOTS
+    private let simulateStall = Atomic<Bool>(false)
+    private let renderedBuffers = Atomic<Int>(0)
+    private let lastRenderedPeak = Atomic<Float>(0)
+    var handoffDiagnostics: (intercepting: Bool, buffers: Int, peak: Float) {
+        (intercepting.load(ordering: .acquiring), renderedBuffers.load(ordering: .relaxed), lastRenderedPeak.load(ordering: .relaxed))
+    }
+    func simulateIOStallForTesting() { simulateStall.store(true, ordering: .relaxed) }
     var activityDiagnostics: String { "tap=\(tapID) aggregate=\(aggregateID) float32=\(_isFloat32) received=\(activity.hasReceivedAudio)" }
     #endif
 
@@ -105,7 +119,10 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
 
         let description = CATapDescription(stereoMixdownOfProcesses: processObjectIDs)
         description.uuid = UUID()
-        description.muteBehavior = monitorOnly ? .unmuted : .mutedWhenTapped
+        // Capture access can succeed while TCC supplies only silence. Never
+        // suppress native playback until real samples and a writable output
+        // have been observed on our IO path.
+        description.muteBehavior = .unmuted
         description.isPrivate = true
         description.name = "\(AudioDevice.plumbingNamePrefix) tap #\(processObjectIDs.first ?? 0)"
 
@@ -143,13 +160,16 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
         _rampCoefficient = 1 - exp(-1 / (Float(sampleRate) * 0.030))
         _limiter = PeakLimiter(sampleRate: sampleRate)
 
-        verifyStreamFormat()
-        if monitorOnly {
-            var format = AudioStreamBasicDescription()
-            _isFloat32 = (try? tapID.read(kAudioTapPropertyFormat, into: &format)) != nil
-                && format.mFormatID == kAudioFormatLinearPCM
-                && format.mFormatFlags & kAudioFormatFlagIsFloat != 0 && format.mBitsPerChannel == 32
+        var format = AudioStreamBasicDescription()
+        try tapID.read(kAudioTapPropertyFormat, into: &format)
+        guard format.mFormatID == kAudioFormatLinearPCM,
+              format.mFormatFlags & kAudioFormatFlagIsFloat != 0,
+              format.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0,
+              format.mBitsPerChannel == 32 else {
+            throw HALError.operation(kAudioHardwareUnsupportedOperationError, "validate tap PCM format")
         }
+        _isFloat32 = true
+        activatedAt = DispatchTime.now().uptimeNanoseconds
 
         var proc: AudioDeviceIOProcID?
         try checked(
@@ -172,18 +192,34 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
             .info("Tap active for processes [\(processIDs, privacy: .public)]: tap \(tap), aggregate \(aggregate)")
     }
 
-    /// Confirms the gain path's Float32 PCM assumption against the aggregate's
-    /// actual stream format; any other format flips the render to passthrough.
-    private func verifyStreamFormat() {
-        var format = AudioStreamBasicDescription()
-        guard (try? aggregateID.read(kAudioDevicePropertyStreamFormat,
-                                     scope: kAudioDevicePropertyScopeOutput,
-                                     into: &format)) != nil else { return }
-        _isFloat32 = format.mFormatID == kAudioFormatLinearPCM
-            && format.mFormatFlags & kAudioFormatFlagIsFloat != 0
-            && format.mBitsPerChannel == 32
-        if !_isFloat32 {
-            Self.logger.warning("Aggregate stream is not Float32 PCM; gain disabled, passing through")
+    /// Called only for control taps. Monitoring taps stay nonmuting forever.
+    /// A dead IO path restores native playback instead of retaining a mute.
+    @MainActor
+    func beginHandoff(onFailure: @escaping @MainActor (ProcessTap) -> Void) {
+        guard !monitorOnly, handoffTask == nil else { return }
+        handoffTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+                guard let self, tapID.isValid else { return }
+                let now = DispatchTime.now().uptimeNanoseconds
+                let callback = lastCallback.load(ordering: .acquiring)
+                if TapHandoffPolicy.isStalled(now: now, activatedAt: activatedAt, lastCallback: callback) {
+                    invalidate()
+                    onFailure(self)
+                    return
+                }
+                guard !intercepting.load(ordering: .acquiring),
+                      readyToHandoff.load(ordering: .acquiring), let description = tapDescription else { continue }
+                description.muteBehavior = .mutedWhenTapped
+                intercepting.store(true, ordering: .releasing)
+                do {
+                    try tapID.writeObjectReference(kAudioTapPropertyDescription, value: description)
+                } catch {
+                    invalidate()
+                    onFailure(self)
+                    return
+                }
+            }
         }
     }
 
@@ -202,6 +238,14 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
     /// Releasing the tap restores the app's native output.
     @MainActor
     func invalidate() {
+        handoffTask?.cancel()
+        handoffTask = nil
+        intercepting.store(false, ordering: .releasing)
+        // Restore native output first, including a driver that stalls teardown.
+        if tapID.isValid, let description = tapDescription {
+            description.muteBehavior = .unmuted
+            try? tapID.writeObjectReference(kAudioTapPropertyDescription, value: description)
+        }
         Self.destroy(aggregateID: aggregateID, tapID: tapID, procID: procID)
         procID = nil
         aggregateID = .unknown
@@ -231,46 +275,40 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
     // MARK: - Real-time path. No allocation, locks, ObjC, or logging below.
 
     private func render(_ input: UnsafePointer<AudioBufferList>, into output: UnsafeMutablePointer<AudioBufferList>) {
-        if _isFloat32 {
-            let now = DispatchTime.now().uptimeNanoseconds
-            for buffer in UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input)) {
-                if let data = buffer.mData {
-                    activity.observe(data.assumingMemoryBound(to: Float.self),
-                        count: Int(buffer.mDataByteSize) / MemoryLayout<Float>.size, now: now)
-                }
-            }
-        }
-        if monitorOnly {
-            Self.silence(output)
-            return
-        }
-        if _isMuted {
-            Self.silence(output)
-            return
-        }
-        if !_isFloat32 {
-            Self.passthrough(input, into: output)
-            return
-        }
-
+        #if RENDER_SHOTS
+        if simulateStall.load(ordering: .relaxed) { Self.silence(output); return }
+        #endif
         let inputs = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         let outputs = UnsafeMutableAudioBufferListPointer(output)
+        // HAL appends the process tap after physical input streams. Input 0
+        // can be a headset microphone: pairing it with output 0 loses audio.
+        guard let source = inputs.last, let inData = source.mData,
+              source.mDataByteSize > 0 else {
+            Self.silence(output)
+            return
+        }
+        let now = DispatchTime.now().uptimeNanoseconds
+        activity.observe(inData.assumingMemoryBound(to: Float.self),
+            count: Int(source.mDataByteSize) / MemoryLayout<Float>.size, now: now)
+        let writable = outputs.contains { $0.mData != nil && $0.mDataByteSize > 0 }
+        if monitorOnly || writable { lastCallback.store(now, ordering: .releasing) }
+        if writable && activity.isPlaying(now: now) { readyToHandoff.store(true, ordering: .releasing) }
+        guard !monitorOnly, intercepting.load(ordering: .acquiring), !_isMuted else {
+            Self.silence(output)
+            return
+        }
         let targetGain = VolumeTaper.gain(position: _volume) * _outputGain
         var gain = _currentGain
         let ramp = _rampCoefficient
 
-        for (index, outBuffer) in outputs.enumerated() {
+        for outBuffer in outputs {
             guard let outData = outBuffer.mData else { continue }
-            guard index < inputs.count, let inData = inputs[index].mData else {
-                memset(outData, 0, Int(outBuffer.mDataByteSize))
-                continue
-            }
             // One ramp shared across the buffer list; in practice taps deliver
             // a single interleaved buffer, so this is exact.
             gain = withUnsafeMutablePointer(to: &_limiter) { limiter in TapMix.mix(
                 input: inData.assumingMemoryBound(to: Float.self),
-                inputLayout: TapMix.Layout(channels: Int(inputs[index].mNumberChannels),
-                                           count: Int(inputs[index].mDataByteSize) / MemoryLayout<Float>.size),
+                inputLayout: TapMix.Layout(channels: Int(source.mNumberChannels),
+                                           count: Int(source.mDataByteSize) / MemoryLayout<Float>.size),
                 output: outData.assumingMemoryBound(to: Float.self),
                 outputLayout: TapMix.Layout(channels: Int(outBuffer.mNumberChannels),
                                             count: Int(outBuffer.mDataByteSize) / MemoryLayout<Float>.size),
@@ -279,6 +317,15 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
             ) }
         }
         _currentGain = gain
+        #if RENDER_SHOTS
+        var peak: Float = 0
+        for buffer in outputs {
+            guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+            for index in 0..<(Int(buffer.mDataByteSize) / MemoryLayout<Float>.size) { peak = max(peak, abs(data[index])) }
+        }
+        lastRenderedPeak.store(peak, ordering: .relaxed)
+        renderedBuffers.wrappingAdd(1, ordering: .relaxed)
+        #endif
     }
 
     private static func silence(_ output: UnsafeMutablePointer<AudioBufferList>) {
@@ -289,24 +336,7 @@ final class ProcessTap: SleepManagedAudioTap, @unchecked Sendable {
         }
     }
 
-    /// Bit-exact copy for unexpected stream formats: no gain, no reinterpretation.
-    private static func passthrough(_ input: UnsafePointer<AudioBufferList>,
-                                    into output: UnsafeMutablePointer<AudioBufferList>) {
-        let inputs = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
-        for (index, outBuffer) in UnsafeMutableAudioBufferListPointer(output).enumerated() {
-            guard let outData = outBuffer.mData else { continue }
-            let outBytes = Int(outBuffer.mDataByteSize)
-            guard index < inputs.count, let inData = inputs[index].mData else {
-                memset(outData, 0, outBytes)
-                continue
-            }
-            let bytes = min(Int(inputs[index].mDataByteSize), outBytes)
-            memcpy(outData, inData, bytes)
-            if bytes < outBytes {
-                memset(outData.advanced(by: bytes), 0, outBytes - bytes)
-            }
-        }
-    }
+
 }
 
 /// Converts an OSStatus into a thrown HALError with context.

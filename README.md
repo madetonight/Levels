@@ -10,7 +10,7 @@ Open `dist/Levels.app`. Left-click the three-fader icon in the menu bar to open 
 
 Levels stays in the menu bar. Launching or reopening the app does not open a window or activate a hidden item. Reveal it through your menu bar manager, then click its icon to open the mixer. On macOS 27 it uses AppKit's expanded-interface lifecycle; earlier systems use the classic button action. Keyboard navigation uses native controls.
 
-- **Output:** master volume, per-app volume/mute, and selected-device buttons are together here. Choose the Mac's default output in Options → Settings → Devices. System default in an app's selector follows that device. Browsers and common playback apps remain in the main list while open; other idle audio apps are in a collapsed Other apps drawer. Apps producing sound enter the main list, with a short grace period through pauses. Helper replacement retains the app until it quits, without preserving obsolete process IDs. Each app has a reset icon on the right of its slider; it restores the configurable default level (100% initially), preserving mute and output. Scrolling works without a visible scrollbar.
+- **Output:** master volume, per-app volume/mute, and selected-device buttons are together here. Playback status sits beside each app name. Choose the Mac's default output in Options → Settings → Devices. System default in an app's selector follows that device. Browsers and common playback apps remain in the main list while open; other idle audio apps are in a collapsed Other apps drawer. Apps producing sound enter the main list, with a short grace period through pauses. Helper replacement retains the app until it quits, without preserving obsolete process IDs. Each app has a reset icon on the right of its slider; it restores the configurable default level (100% initially), preserving mute and output. Scrolling works without a visible scrollbar.
 - **Input:** select an input and adjust gain when supported by the hardware. Shows which apps are using the microphone.
 - **Settings:** the dedicated Settings window holds device choices, login, optional monitor/Bluetooth features, default reset level, and volume reset. Appearance and Updates remain separate menu choices. Right-click an app row for reset actions.
 
@@ -20,7 +20,7 @@ macOS requires **System Audio Recording** permission for per-app processing and 
 
 Volume changes apply to the whole app, including its helper processes, rather than individual browser tabs. Output switching itself does not need audio recording permission. Fixed HDMI/DisplayPort devices can use optional software master volume enabled in Settings. Other devices without writable volume show a read-only explanation.
 
-For simultaneous playback on different devices, connect your headphones and start Spotify and a browser video. In Output, use each app's device button to choose your headphones for Spotify and MacBook Pro Speakers for the browser. Per-app selection does not change the Mac's default output, and each app keeps its own level and mute control. Selecting System default restores normal output following. If a selected device disconnects, the app falls back to the current system output while remembering its selection. Per-app routing uses the same audio permission as per-app volume control. The user verified Spotify/headphone and browser/speaker simultaneous playback with independent volume and mute controls.
+For simultaneous playback on different devices, connect your headphones and start Spotify and a browser video. In Output, use each app's device button below its slider to choose your headphones for Spotify and MacBook Pro Speakers for the browser. Per-app selection does not change the Mac's default output, and each app keeps its own level and mute control. Selecting System default restores normal output following. If a selected device disconnects, the app falls back to the current system output while remembering its selection. Per-app routing uses the same audio permission as per-app volume control. The user verified Spotify/headphone and browser/speaker simultaneous playback with independent volume and mute controls.
 
 Levels must remain running for adjusted app volumes to apply. Quitting restores each app's original audio path; this can increase the volume of previously quiet or muted apps. Levels remembers settings for the next launch.
 
@@ -53,7 +53,7 @@ To render the native interface in both themes without opening any visible window
 
 This standalone harness compiles with `RENDER_SHOTS`, seeds example levels, and writes Output and Input screenshots for both surfaces to `dist/appearance`. The harness is excluded from the app target and does not change saved volume or appearance preferences.
 
-Local builds use ad-hoc signing. Distribution signing and notarization have not been configured; rebuilding may require granting macOS audio access again.
+Debug builds default to ad-hoc signing. Owner beta releases use the approved Apple Development certificate selected in ignored `.release-signing`; the private key remains in Keychain. Keep this identity for subsequent releases. The first transition may require audio permission once. Apple notarization is not configured.
 
 To build the optimized Apple silicon release and its drag-to-Applications disk image:
 
@@ -61,17 +61,17 @@ To build the optimized Apple silicon release and its drag-to-Applications disk i
 ./Scripts/package-dmg.sh
 ```
 
-This preserves the regular development build, places the optimized app and ZIP in `dist/Release/`, and creates `dist/Levels-0.1.5-arm64.dmg`. The image includes the app, an Applications shortcut, install/privacy notes, and MIT attribution. This package has an ad-hoc signature: it has no Developer ID distribution signature or Apple notarization and fails Gatekeeper's public-distribution assessment. Do not describe it as a notarized public installer. Package measurements and verification results are in `dist/Release/package-details.json`.
+This preserves the regular development build, places the optimized app and ZIP in `dist/Release/`, and creates `dist/Levels-0.1.8-arm64.dmg`. The image includes the app, an Applications shortcut, install/privacy notes, and MIT attribution. The owner beta has an Apple Development signature, but no Developer ID distribution signature or Apple notarization. First-launch Gatekeeper approval can still be required. Do not describe it as a notarized public installer. Package measurements and verification results are in `dist/Beta/package-details.json`.
 
 ## Downloadable beta
 
-[Download Levels 0.1.7 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.7-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
+[Download Levels 0.1.8 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.8-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
 
 Run `Scripts/package-beta.sh` to package the existing optimized app in `dist/Release/Levels.app` as a clearly labeled, unnotarized beta. After source changes, rebuild with `Scripts/package-dmg.sh` first. The beta DMG, app-only ZIP, portable checksums, release notes, and package measurements are kept in `dist/Beta/`. See BETA.md for publishing and installation validation.
 
 ## Playback status
 
-While the mixer is visible, Levels reuses existing control taps or creates passive nonmuting taps to distinguish actual signal from a silent open stream. A 200 ms activity hold avoids flickering between audio buffers. No samples are retained. Passive taps are released when the mixer closes or the Mac sleeps; setup runs off the UI thread. If capture is unavailable, Output active reports the macOS stream flag without pretending it proves audible sound. Muted/zero-volume apps report Muted/Silent.
+While the mixer is visible, Levels reuses existing control taps or creates passive nonmuting taps to distinguish actual signal from a silent open stream. A 200 ms activity hold avoids flickering between audio buffers. No samples are retained. Passive taps are released when the mixer closes or the Mac sleeps; setup runs off the UI thread. If capture is unavailable, Playing uses measured audio where available and otherwise the macOS output-stream flag. Idle indicates no detected playback. Muted/zero-volume apps report Muted/Silent.
 
 Pauses and audio-helper replacement retain a row while its app remains open; its label updates independently. Rows stay alphabetical. Cached rows never retain obsolete process object IDs; adjusted controls apply again when a new helper appears.
 

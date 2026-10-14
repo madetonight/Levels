@@ -34,6 +34,9 @@ final class BluetoothAudioMonitor {
     private(set) var paired: [BluetoothAudioDevice] = []
     /// Addresses with a connect/disconnect operation in flight.
     private(set) var busy: Set<String> = []
+    /// Connected audio devices are discovered through Core Audio. Paired-device
+    /// Bluetooth access is unnecessary until an explicit connect/disconnect.
+    private(set) var pairedDeviceAccessEnabled = false
 
     /// At most one enumeration runs at a time. Notifications that arrive while
     /// it is in flight collapse into one follow-up read so the final snapshot is
@@ -50,6 +53,7 @@ final class BluetoothAudioMonitor {
 
     /// Enumerates off the main actor — IOBluetooth calls can block.
     func refresh() {
+        guard pairedDeviceAccessEnabled else { return }
         #if RENDER_SHOTS
             // Screenshots must not touch the live system; IOBluetooth/CoreBluetooth
             // access trips TCC and aborts the render process.
@@ -100,6 +104,7 @@ final class BluetoothAudioMonitor {
 
     /// Opens the connection off the main thread; IOBluetooth blocks for seconds.
     func connect(_ device: BluetoothAudioDevice, onConnected: @escaping @MainActor (BluetoothAudioDevice) -> Void) {
+        pairedDeviceAccessEnabled = true
         guard !busy.contains(device.id) else { return }
         busy.insert(device.id)
         let address = device.id
@@ -120,6 +125,7 @@ final class BluetoothAudioMonitor {
     }
 
     func disconnect(_ device: BluetoothAudioDevice) {
+        pairedDeviceAccessEnabled = true
         guard !busy.contains(device.id) else { return }
         busy.insert(device.id)
         let address = device.id

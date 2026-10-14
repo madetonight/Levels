@@ -50,3 +50,20 @@ struct AudioTapLifecycleTests {
         #expect(lifecycle.taps.isEmpty)
     }
 }
+
+@Suite("Audio handoff safety")
+struct TapHandoffPolicyTests {
+    @Test("HAL objects without working callbacks fail open")
+    func noCallbacks() {
+        #expect(!TapHandoffPolicy.isStalled(now: 2_000_000_000, activatedAt: 1, lastCallback: 0))
+        #expect(TapHandoffPolicy.isStalled(now: 3_000_000_000, activatedAt: 1, lastCallback: 0))
+    }
+    @Test("a callback that stops after takeover fails open")
+    func stalledAfterHandoff() {
+        #expect(TapHandoffPolicy.isStalled(now: 6_000_000_000, activatedAt: 1, lastCallback: 3_000_000_000))
+    }
+    @Test("digital silence still counts as healthy IO")
+    func healthyIdle() {
+        #expect(!TapHandoffPolicy.isStalled(now: 6_000_000_000, activatedAt: 1, lastCallback: 5_900_000_000))
+    }
+}

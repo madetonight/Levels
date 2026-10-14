@@ -48,13 +48,14 @@ app, dmg, archive = map(Path, sys.argv[1:])
 info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
 files = [p for p in app.rglob('*') if p.is_file() and not p.is_symlink()]
 hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in [dmg, archive]}
+signature = subprocess.run(['codesign', '-d', '--verbose=4', str(app)], check=True, capture_output=True, text=True).stderr
 (dmg.parent / 'SHA256SUMS.txt').write_text(''.join(f'{digest}  {name}\n' for name, digest in hashes.items()))
 details = {
     'name': 'Levels', 'channel': 'beta',
     'version': info['CFBundleShortVersionString'], 'build': info['CFBundleVersion'],
     'architecture': 'arm64', 'minimum_macos': info['LSMinimumSystemVersion'],
     'bundle_id': info['CFBundleIdentifier'], 'notarized': False,
-    'signing': 'ad-hoc; Apple Developer ID not used',
+    'signing': 'ad-hoc; Apple Developer ID not used' if 'Signature=adhoc' in signature else 'certificate signed; not Apple-notarized',
     'dmg_file': dmg.name, 'dmg_bytes': dmg.stat().st_size,
     'zip_file': archive.name, 'zip_bytes': archive.stat().st_size,
     'app_logical_bytes': sum(p.stat().st_size for p in files),

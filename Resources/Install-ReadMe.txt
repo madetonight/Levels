@@ -1,4 +1,4 @@
-LEVELS 0.1.7 — PUBLIC BETA (NOT NOTARIZED)
+LEVELS 0.1.8 — PUBLIC BETA (NOT NOTARIZED)
 
 A menu-bar volume mixer for your Mac.
 
@@ -20,7 +20,7 @@ Install
 Output
 Use Options → Settings → Devices to choose the Mac's default output.
 Each application's slider adjusts its volume; its speaker button toggles mute.
-Use the device button beside an app's name to choose where that app plays.
+Use the selected-device button below an app's slider to choose where it plays.
 Different apps can play through different outputs simultaneously. Each app has
 a reset icon on the right of its slider. It restores the default level
 chosen in Settings → App volumes (100% initially), preserving mute and output.
@@ -38,14 +38,15 @@ Audio access and privacy
 Per-app volume, mute, and routing need macOS System Audio Recording permission.
 Levels processes selected apps' audio locally in real time. While the mixer is
 open, passive nonmuting taps distinguish sound from silent open streams. They
-are released when the mixer closes. Playing means signal was measured; Output
-active means macOS reports an open output stream but measurement is unavailable. It does not save
+are released when the mixer closes. Playing/Idle describe signal when measured, falling back to macOS output activity
+when measurement is unavailable. It does not save
 audio recordings or upload audio. macOS displays a privacy indicator while
 audio access is active. Your volume, mute, and output choices are remembered.
 
 Release status
-This beta uses a free ad-hoc signature. It is not signed with Apple Developer
-ID or notarized. macOS normally blocks the first launch of a browser download;
+This beta uses an Apple Development certificate with a stable signing identity.
+It is not signed with Apple Developer ID or notarized. The first transition to
+this certificate may require audio permission again. macOS normally blocks the first launch of a browser download;
 Apple's Open Anyway flow may be available. Managed Macs can restrict it.
 Downloading beta software means accepting unfinished behavior. Start with
 low playback volume, especially when testing mute or external output devices.
@@ -55,7 +56,9 @@ Updates offers a manual update check and a remembered automatic-check setting.
 The public update feed is https://madetonight.github.io/Levels/appcast.xml.
 Install this beta manually if upgrading from 0.1.4 or earlier. Future versions
 can be installed inside Levels using Options → Updates → Check for Updates.
-Enable Automatically check for updates for daily checks. Levels verifies each
+Automatic daily checks default on for new installs; your saved choice is kept.
+A small white dot on the menu-bar icon and Options button indicates an available
+update. Options → Updates identifies its version. Levels verifies each
 update archive and asks before installation; it never installs silently.
 It does not ask for an account or subscription.
 

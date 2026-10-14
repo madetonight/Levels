@@ -25,7 +25,37 @@ struct UpdatePreferences {
     let defaults: UserDefaults
 
     var automaticallyChecks: Bool {
-        get { defaults.bool(forKey: "SUEnableAutomaticChecks") }
+        get { defaults.object(forKey: "SUEnableAutomaticChecks") as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: "SUEnableAutomaticChecks") }
+    }
+}
+
+/// Keep a verified update visible across relaunches, without caching an alert
+/// for a build that has already been installed or was explicitly skipped.
+struct UpdateAvailability {
+    let defaults: UserDefaults
+    let currentBuild: String
+    private static let buildKey = "LevelsAvailableUpdateBuild"
+    private static let versionKey = "LevelsAvailableUpdateVersion"
+
+    var version: String? {
+        guard let build = defaults.string(forKey: Self.buildKey),
+              build.compare(currentBuild, options: .numeric) == .orderedDescending,
+              defaults.string(forKey: "SUSkippedVersion") != build else { return nil }
+        return defaults.string(forKey: Self.versionKey)
+    }
+
+    func found(version: String, build: String) {
+        guard build.compare(currentBuild, options: .numeric) == .orderedDescending else {
+            clear()
+            return
+        }
+        defaults.set(build, forKey: Self.buildKey)
+        defaults.set(version, forKey: Self.versionKey)
+    }
+
+    func clear() {
+        defaults.removeObject(forKey: Self.buildKey)
+        defaults.removeObject(forKey: Self.versionKey)
     }
 }

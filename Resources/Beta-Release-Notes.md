@@ -1,17 +1,19 @@
-# Levels 0.1.7 beta
+# Levels 0.1.8 beta
 
-A compact mixer with thinner output buttons, shorter sliders, and a quieter app list.
+Safe audio handoff, a compact mixer, and quiet update notifications.
 
 ## What changed
 
-- Thin, flat output buttons show each app's selected device. Full names and the system-default choice remain available in the native menu and tooltip.
-- Smaller master-volume and microphone-gain percentages sit directly beside their sliders.
-- Compact, aligned app rows with a reset icon on the right of the slider. Reset restores the level from Settings (100% initially), preserving mute and output choices.
-- Shorter slider travel, with a slightly thicker track and thumb. Per-app range remains 0–200%, with limiting above 100%.
-- Browsers and common playback apps remain directly available. Other idle audio processes appear in a collapsed Other apps drawer; producing sound promotes an app into the main list, with a short grace period to avoid flicker.
-- Known apps remain available throughout their open session even if an audio helper disappears. Cached helpers cannot create controls for obsolete process IDs.
-- Scrolling works without visible scrollbars. The redundant inactive-app preference is removed.
-- The master output uses the matching device symbol; MacBook speakers use a laptop icon.
+- Startup no longer mutes native playback before the replacement audio path delivers real samples. Stalled callbacks release the tap and restore native playback; saved levels and routes are retained.
+- Process taps use their own appended input buffer rather than a physical microphone stream. Passive meters remain nonmuting.
+- This beta uses the owner’s stable Apple Development certificate. The first switch may require audio access approval once; later builds keep the same signing identity. It is not Apple-notarized.
+
+- A small white update-available dot appears on the menu-bar icon and Options button. The Updates menu offers the available version. Scheduled checks use a gentle indicator; manual checks open the install dialog.
+- Automatic update checks are enabled for new installs. Existing choices, including an explicit opt-out, are preserved. Installation still requires approval.
+- Full selected-output names appear in wider thin buttons below each app slider. Playback status sits beside the app name and uses Playing/Idle wording, while mute and zero-volume states remain distinct.
+- San Francisco typography for Master volume; the larger master percentage shares the app-percentage column. Sliders retain their travel and aligned controls.
+- Ordinary volume, routing, startup, sleep recovery and device-change handling no longer scan paired Bluetooth devices. Connected Bluetooth outputs remain available through Core Audio. Direct Bluetooth access waits for an explicit connect/disconnect action.
+- Saved volume, mute, routing and appearance choices are retained.
 
 ## Install or update
 

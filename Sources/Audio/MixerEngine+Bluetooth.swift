@@ -68,6 +68,7 @@ extension MixerEngine {
     /// Twice: once now, once after IOBluetooth's connection state has had a
     /// moment to settle — it lags the HAL by a beat in both directions.
     func refreshBluetoothSoon() {
+        guard bluetooth.pairedDeviceAccessEnabled else { return }
         bluetooth.refresh()
         bluetoothRefreshTask?.cancel()
         bluetoothRefreshTask = Task { @MainActor [weak self] in

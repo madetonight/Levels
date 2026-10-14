@@ -25,3 +25,12 @@ Physical monitor, Bluetooth, sleep/wake, and another-Mac first-launch behavior s
 ### Published update verification
 
 Published v0.1.7-beta from source commit 0c3e04e. Four public release assets were downloaded without credentials and matched their local package bytes and lengths. The live HTTPS appcast matched the signed generated XML exactly. An isolated 0.1.6/build 7 app using the shipping Sparkle runtime checked, downloaded, installed and relaunched 0.1.7/build 9. Installed executable bytes matched the final Release app; strict signatures passed. Saved app volume, mute, routing, feature and appearance choices were preserved. Device last-used timestamps refreshed normally on relaunch. The exact shipping app was restored to the normal project build location. Physical hardware and another-Mac first-launch checks remain pending.
+
+
+## Levels 0.1.8 / build 12 — safe audio handoff
+
+90 regression tests in 21 suites passed. Optimized arm64 Release build, strict nested signatures and both DMG checksums passed. The isolated native audio harness used the shipping sandbox and an actual generated tone: capture began unmuted, adjusted PCM reached the output callback, explicit mute/unmute worked, passive metering never muted, and an injected IO stall released interception. No audio recordings were saved. This verifies the Core Audio path, not human listening on every output device.
+
+Full selected-device names, inline Playing/Idle status, aligned percentages, and gentle update-available indicators are included. Native menu and output selection actions and three Settings open/close/reopen cycles passed. Scheduled update checks preserve existing opt-outs; installation remains user-approved. Paired Bluetooth access is deferred to an explicit connection action.
+
+Owner beta builds now retain the approved Apple Development signing identity; the first identity transition may require audio permission once. Strict signatures and the app sandbox remain enabled. This does not provide Developer ID or Apple notarization; another-Mac first launch, external monitor/Bluetooth hardware and broader sleep/wake listening tests remain pending.

@@ -39,6 +39,7 @@ final class MixerEngine {
         set { tapLifecycle.taps = newValue }
     }
     @ObservationIgnored private var permissionDeniedApps: Set<String> = []
+    @ObservationIgnored private var failedTapProcesses: [String: [AudioObjectID]] = [:]
     /// One volume control per pinned-and-present device, keyed by UID — each
     /// routed output gets its own slider, like multi-output members.
     @ObservationIgnored private var routeVolumes: [String: DeviceVolumeController] = [:]
@@ -103,7 +104,6 @@ final class MixerEngine {
         inputVolume.start()
         inputDeviceMonitor.start()
         multiOutput.start()
-        bluetooth.refresh()
         systemVolume.onSoftwareChange = { [weak self] in self?.syncTaps() }
         volumeKeys.start()
 
@@ -123,6 +123,7 @@ final class MixerEngine {
     }
 
     func retryAudioAccess() {
+        failedTapProcesses.removeAll()
         permissionDeniedApps.removeAll()
         needsAudioCapturePermission = false
         syncTaps()
@@ -214,6 +215,7 @@ final class MixerEngine {
     // MARK: - Private
 
     func discardHALBoundState() {
+        failedTapProcesses.removeAll()
         tapLifecycle.discard()
         routeVolumes.removeAll()
     }
@@ -260,6 +262,7 @@ final class MixerEngine {
     }
 
     private func apply(_ entry: AppVolume, to app: AudioApp) {
+        failedTapProcesses[app.bundleID] = nil
         volumes[app.bundleID] = entry
         scheduleSave()
 
@@ -351,7 +354,8 @@ final class MixerEngine {
         // pinned to another aggregate is unproven (the CLI probe's IO proc
         // never fired), and a silently dead tap would mute the app outright.
         // Saved volumes survive and re-apply once multi-output dissolves.
-        guard !tapLifecycle.isSleeping, !multiOutput.isActive else { return }
+        guard !tapLifecycle.isSleeping, !multiOutput.isActive,
+              failedTapProcesses[app.bundleID] != app.objectIDs else { return }
         let outputs: [ProcessTap.Output]
         do {
             outputs = try resolvedOutputs(for: entry)
@@ -373,7 +377,13 @@ final class MixerEngine {
                 outputGain: control.outputGain
             )
             try tap.activate(outputs: outputs)
-            tapLifecycle.install(tap, for: app.bundleID)
+            guard tapLifecycle.install(tap, for: app.bundleID) else { return }
+            tap.beginHandoff { [weak self] failed in
+                guard let self, self.taps[app.bundleID] === failed else { return }
+                self.taps[app.bundleID] = nil
+                self.failedTapProcesses[app.bundleID] = app.objectIDs
+                self.tapErrors[app.bundleID] = "Audio adjustment stopped. Native playback restored; change the level to retry."
+            }
             permissionDeniedApps.remove(app.bundleID)
             needsAudioCapturePermission = !permissionDeniedApps.isEmpty
             tapErrors[app.bundleID] = nil

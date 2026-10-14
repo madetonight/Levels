@@ -5,12 +5,16 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 LEVELS_RELEASE_DATA="${LEVELS_RELEASE_DATA:-/private/tmp/LevelsReleaseDerivedData}"
 LEVELS_RELEASE_DIR="$PROJECT_ROOT/dist/Release"
+if [ -z "${LEVELS_SIGNING_IDENTITY:-}" ] && [ -f "$PROJECT_ROOT/.release-signing" ]; then
+  LEVELS_SIGNING_IDENTITY="$(cat "$PROJECT_ROOT/.release-signing")"
+fi
+LEVELS_SIGNING_IDENTITY="${LEVELS_SIGNING_IDENTITY:--}"
 LEVELS_STAGE="$(mktemp -d "$PROJECT_ROOT/dist/.levels-package.XXXXXX")"
 trap 'rm -rf "$LEVELS_STAGE"' EXIT
 
 xcodebuild -project "$PROJECT_ROOT/Levels.xcodeproj" -scheme Levels -clonedSourcePackagesDirPath "$PROJECT_ROOT/Vendor/SourcePackages" \
   -configuration Release -derivedDataPath "$LEVELS_RELEASE_DATA" \
-  ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- ENABLE_HARDENED_RUNTIME=NO build
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=NO "CODE_SIGN_IDENTITY=$LEVELS_SIGNING_IDENTITY" ENABLE_HARDENED_RUNTIME=NO build
 # Free ad-hoc beta signatures have no Apple Team ID. Hardened Runtime's
 # library validation cannot load the ad-hoc Sparkle framework in this build.
 # The app sandbox stays enabled. Developer ID archive builds retain the

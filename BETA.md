@@ -1,6 +1,11 @@
 # Zero-budget Levels beta
 
-The current downloadable beta is 0.1.7/build 9, Apple silicon, macOS 15+. It uses the verified optimized Release app, free ad-hoc signing, and no Apple notarization. Publishing this beta does not require paid Apple Developer membership. Self-signed or Sparkle update signatures do not create Gatekeeper trust.
+The current downloadable beta is 0.1.8/build 12, Apple silicon, macOS 15+. It uses the verified optimized Release app, an owner-approved Apple Development certificate, and no Apple notarization. Publishing this beta does not require paid Apple Developer membership. Self-signed or Sparkle update signatures do not create Gatekeeper trust.
+
+The certificate selection is kept in the ignored local `.release-signing` file.
+The private key stays in Keychain. Keep the same identity for later owner releases;
+a fresh clone can set `LEVELS_SIGNING_IDENTITY` to its own certificate or `-`.
+Changing identity may require audio permission once. This does not provide notarization.
 
 ## Build and package
 
@@ -10,11 +15,11 @@ The output in dist/Beta contains the drag-to-Applications DMG, app-only ZIP, SHA
 
 ## Published release
 
-The updated sample is prepared as v0.1.7-beta. Publish its verified DMG, ZIP, and checksums at https://github.com/madetonight/Levels/releases/tag/v0.1.7-beta. No signing key or credential belongs in the repository.
+The updated sample is prepared as v0.1.8-beta. Publish its verified DMG, ZIP, and checksums at https://github.com/madetonight/Levels/releases/tag/v0.1.8-beta. No signing key or credential belongs in the repository.
 
 For subsequent releases:
 
-Use the public `madetonight/Levels` repository. Create a GitHub release tagged `v0.1.7-beta`, title `Levels 0.1.7 beta`, and mark it as a pre-release. Use dist/Beta/RELEASE-NOTES.md for the description. Upload the DMG, optional ZIP, and SHA256SUMS.txt. Publishing binaries does not require uploading local source or developer credentials. Keep the beta label and unnotarized-install notice visible next to the download.
+Use the public `madetonight/Levels` repository. Create a GitHub release tagged `v0.1.8-beta`, title `Levels 0.1.8 beta`, and mark it as a pre-release. Use dist/Beta/RELEASE-NOTES.md for the description. Upload the DMG, optional ZIP, and SHA256SUMS.txt. Publishing binaries does not require uploading local source or developer credentials. Keep the beta label and unnotarized-install notice visible next to the download.
 
 ## Verify a fresh installation
 
@@ -24,7 +29,7 @@ Test first launch, menu-bar icon, audio permission, saved volume/mute, independe
 
 ## Updates
 
-The connected beta uses https://madetonight.github.io/Levels/appcast.xml. Earlier releases through 0.1.4 need manual installation of this build first. Updates are then checked inside Levels; daily checking is opt-in and installation requires approval. Sparkle archive signatures are free and separate from Apple signing. See UPDATES.md for publishing and verification steps.
+The connected beta uses https://madetonight.github.io/Levels/appcast.xml. Earlier releases through 0.1.4 need manual installation of this build first. Updates are then checked inside Levels; daily checks default on for new installs, with saved opt-outs retained and installation requires approval. Sparkle archive signatures are free and separate from Apple signing. See UPDATES.md for publishing and verification steps.
 
 
 ## First-launch trust and the zero-budget constraint

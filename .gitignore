@@ -6,3 +6,5 @@ Vendor/SourcePackages/
 dist/
 .publish-repository/
 Design/
+
+.release-signing

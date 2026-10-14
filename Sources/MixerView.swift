@@ -7,6 +7,11 @@ enum MixerLayout {
     static let width: CGFloat = 320
     static let height: CGFloat = 560
     static let tabsWidth: CGFloat = 200
+    static let appSliderWidth: CGFloat = 180
+    static let systemSliderWidth: CGFloat = 210
+    static let levelWidth: CGFloat = 42
+    static let actionWidth: CGFloat = 28
+    static let controlGap: CGFloat = 4
 }
 
 private enum MixerTab: String, CaseIterable {
@@ -83,13 +88,16 @@ final class MixerOptions: NSObject {
         updatesMenu.autoenablesItems = false
         add("Check for Updates…", to: updatesMenu, action: #selector(checkForUpdates))
         updatesMenu.items.last?.isEnabled = updates.canCheckForUpdates
+        if let version = updates.availableVersion {
+            add("Install Levels \(version)…", to: updatesMenu, action: #selector(checkForUpdates))
+        }
         add("Automatically check for updates", to: updatesMenu, action: #selector(toggleAutomaticUpdates), checked: updates.automaticallyChecks)
         if !updates.isConfigured {
             updatesMenu.addItem(.separator())
             let waiting = updatesMenu.addItem(withTitle: "Waiting for first published update", action: nil, keyEquivalent: "")
             waiting.isEnabled = false
         }
-        let updatesItem = menu.addItem(withTitle: "Updates", action: nil, keyEquivalent: "")
+        let updatesItem = menu.addItem(withTitle: updates.hasUpdateAvailable ? "Updates · Available" : "Updates", action: nil, keyEquivalent: "")
         updatesItem.submenu = updatesMenu
         add("About Levels", to: menu, action: #selector(showAbout))
         menu.addItem(.separator())
@@ -279,6 +287,8 @@ private struct MixerOptionsButton: NSViewRepresentable {
     func updateNSView(_ button: NSButton, context: Context) {
         context.coordinator.options = options
         button.contentTintColor = color
+        button.setAccessibilityLabel(options.updates.hasUpdateAvailable ? "Levels options, update available" : "Levels options")
+        button.toolTip = options.updates.availableVersion.map { "Options · Levels \($0) update available" } ?? "Options"
     }
 
     @MainActor final class Coordinator: NSObject {
@@ -429,6 +439,13 @@ struct MixerView: View {
     private var optionsMenu: some View {
         MixerOptionsButton(options: options, color: NSColor(palette.secondary))
             .frame(width: 28, height: 28)
+            .overlay(alignment: .topTrailing) {
+                if options.updates.hasUpdateAvailable {
+                    Circle().fill(.white).frame(width: 5, height: 5)
+                        .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.5))
+                        .allowsHitTesting(false).accessibilityHidden(true)
+                }
+            }
     }
 
     private var systemCard: some View {
@@ -436,12 +453,15 @@ struct MixerView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionTitle(tab == .input ? "MICROPHONE GAIN" : "MASTER VOLUME")
-                    HStack(spacing: 8) {
+                    Text(tab == .input ? "Microphone gain" : "Master volume")
+                        .font(.system(size: 11, weight: .semibold, design: .default))
+                        .foregroundStyle(palette.secondary)
+                    HStack(spacing: 9) {
                         Image(systemName: masterDeviceSymbol)
-                            .font(.system(size: 15)).accessibilityHidden(true)
+                            .font(.system(size: 15)).frame(width: 24, height: 24)
+                            .accessibilityHidden(true)
                         Text(controller.deviceName.isEmpty ? "No device available" : controller.deviceName)
-                            .font(.system(size: 12, weight: .medium)).lineLimit(1)
+                            .font(.system(size: 12, weight: .medium, design: .default)).lineLimit(1)
                             .contextMenu {
                                 Button(controller.isMuted ? "Unmute device" : "Mute device") { controller.toggleMute() }
                                     .disabled(!controller.canMute || !engine.isStarted)
@@ -451,16 +471,18 @@ struct MixerView: View {
                 }
                 Spacer(minLength: 4)
             }
-            HStack(alignment: .center, spacing: 4) {
+            HStack(alignment: .center, spacing: 0) {
                 MixerVolumeSlider(value: Binding(get: { controller.volume }, set: { controller.setVolume($0) }),
                                   palette: palette, label: tab == .input ? "Microphone gain" : "Master volume")
-                    .frame(width: 210)
+                    .frame(width: MixerLayout.systemSliderWidth)
                     .disabled(!controller.canSetVolume || !engine.isStarted)
                     .opacity(controller.isMuted ? 0.5 : 1)
                 Text("\(Int((controller.volume * 100).rounded()))%")
-                    .font(.system(size: 12, weight: .medium)).monospacedDigit()
-                    .frame(width: 42, alignment: .leading)
+                    .font(.system(size: 16, weight: .semibold, design: .default)).monospacedDigit()
+                    .frame(width: MixerLayout.levelWidth, alignment: .trailing)
                     .foregroundStyle(controller.isMuted ? palette.secondary : palette.text)
+                Color.clear.frame(width: MixerLayout.actionWidth + MixerLayout.controlGap, height: 20)
+                    .accessibilityHidden(true)
             }
             if engine.isStarted, !controller.canSetVolume {
                 Text("Volume is controlled on this device.")
@@ -687,41 +709,47 @@ private struct AppLevelRow: View {
             HStack(spacing: 9) {
                 Image(nsImage: app.icon).resizable().interpolation(.high).frame(width: 24, height: 24)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .center, spacing: 8) {
                     Text(app.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                        .layoutPriority(1)
                     HStack(spacing: 5) {
                         Circle().fill(palette.fill.opacity(volume.isMuted ? 0.35 : 0.65)).frame(width: 4, height: 4)
-                        Text(error != nil ? "Not applied · retry or reset" : (volume.isMuted ? "Muted" : (volume.volume == 0 ? "Silent" : (app.isPlaying ? (app.isPlaybackMeasured ? "Playing" : "Output active") : "Idle"))))
+                        Text(error != nil ? "Not applied · retry or reset" : (volume.isMuted ? "Muted" : (volume.volume == 0 ? "Silent" : (app.isPlaying ? "Playing" : "Idle"))))
                             .font(.system(size: 10)).foregroundStyle(error != nil ? Color.orange : palette.secondary)
                             .lineLimit(1)
                     }
                 }
                 Spacer(minLength: 3)
-                outputSelector
                 Button { engine.toggleMute(for: app) } label: {
                     Image(systemName: volume.isMuted ? "speaker.slash" : "speaker.wave.2")
-                        .font(.system(size: 13)).frame(width: 24, height: 24)
+                        .font(.system(size: 13)).frame(width: MixerLayout.actionWidth, height: 28)
                         .foregroundStyle(palette.secondary)
                         .background(volume.isMuted ? palette.button : Color.clear, in: RoundedRectangle(cornerRadius: 7))
                 }.buttonStyle(.plain)
                 .accessibilityLabel("\(volume.isMuted ? "Unmute" : "Mute") \(app.name)")
             }
-            HStack(spacing: 4) {
+            HStack(spacing: MixerLayout.controlGap) {
                 MixerVolumeSlider(value: Binding(get: { engine.volume(for: app).volume }, set: { engine.setVolume($0, for: app) }),
                                   palette: palette, label: "\(app.name) volume", maximum: VolumeTaper.maximumPosition)
-                    .frame(width: 180)
+                    .frame(width: MixerLayout.appSliderWidth)
                     .opacity(volume.isMuted ? 0.5 : 1)
                     .help("0–200%. Boost above 100% uses a peak limiter to prevent digital clipping.")
                 Spacer(minLength: 4)
                 Text("\(Int((volume.volume * 100).rounded()))%")
                     .font(.system(size: 12, weight: .medium)).monospacedDigit()
-                    .frame(width: 42, alignment: .trailing)
+                    .frame(width: MixerLayout.levelWidth, alignment: .trailing)
                     .foregroundStyle(volume.volume > 1 ? Color.orange : palette.secondary)
+                Color.clear.frame(width: MixerLayout.actionWidth, height: 20)
+                    .accessibilityHidden(true)
+            }
+            HStack(spacing: MixerLayout.controlGap) {
+                outputSelector.padding(.leading, 6)
+                Spacer(minLength: 4)
                 Button { engine.resetLevel(for: app) } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(palette.secondary)
-                        .frame(width: 28, height: 28)
+                        .frame(width: MixerLayout.actionWidth, height: 28)
                         .contentShape(Rectangle())
                 }.buttonStyle(.plain)
                     .accessibilityLabel("Reset \(app.name) to \(Int((engine.appResetLevel * 100).rounded())) percent")
@@ -754,8 +782,9 @@ private struct AppLevelRow: View {
                         engine.setOutput(device, for: app)
                     }
                 }
-            ), devices: devices, systemName: systemName, label: "Output for \(app.name)", detail: outputDescription)
-        .frame(width: 100, height: 20)
+            ), devices: devices, systemName: systemName, title: selectedName,
+            label: "Output for \(app.name)", detail: outputDescription)
+        .frame(width: 220, height: 20)
         .background(palette.button.opacity(0.18), in: RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(palette.line.opacity(0.7), lineWidth: 0.5))
         .disabled(!engine.isStarted)
@@ -764,19 +793,20 @@ private struct AppLevelRow: View {
     }
 }
 
-/// A native popup button keeps the selected route visible at a fixed width.
-/// Its menu retains complete names, checkmarks, keyboard navigation and focus.
+/// The space below the slider shows the selected device's name. The native
+/// pull-down retains full menu names, checkmarks, keyboard navigation and focus.
 private struct AppOutputButton: NSViewRepresentable {
     @Binding var selection: String
     let devices: [AudioDevice]
     let systemName: String
+    let title: String
     let label: String
     let detail: String
     @Environment(\.isEnabled) private var isEnabled
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSPopUpButton {
-        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        let button = NSPopUpButton(frame: .zero, pullsDown: true)
         button.controlSize = .mini
         button.font = .systemFont(ofSize: 11, weight: .regular)
         button.bezelStyle = .rounded
@@ -798,22 +828,31 @@ private struct AppOutputButton: NSViewRepresentable {
         if !selection.isEmpty && !devices.contains(where: { $0.uid == selection }) {
             choices.append((selection, "Unavailable · using \(systemName)"))
         }
-        let previous = button.itemArray.map { (($0.representedObject as? String) ?? "", $0.title) }
+        let previous = button.itemArray.dropFirst().map { (($0.representedObject as? String) ?? "", $0.title) }
         if previous.count != choices.count || zip(previous, choices).contains(where: { $0.0 != $1.0 || $0.1 != $1.1 }) {
             button.removeAllItems()
+            // The first item labels the button and stays out of its menu.
+            // NSPopUpButton's addItem removes an existing equal title. Build
+            // with a distinct header before assigning the selected name.
+            button.addItem(withTitle: "Output")
             for (uid, name) in choices {
                 button.addItem(withTitle: name)
                 button.lastItem?.representedObject = uid
             }
         }
-        button.selectItem(at: choices.firstIndex { $0.0 == selection } ?? 0)
+        if button.item(at: 0)?.title != title { button.item(at: 0)?.title = title }
+        if button.indexOfSelectedItem != 0 { button.selectItem(at: 0) }
+        for item in button.itemArray {
+            let state: NSControl.StateValue = (item.representedObject as? String) == selection ? .on : .off
+            if item.state != state { item.state = state }
+        }
         button.isEnabled = isEnabled
         button.toolTip = detail
         button.setAccessibilityLabel(label)
         button.setAccessibilityValue(detail)
     }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
-        CGSize(width: 100, height: 20)
+        CGSize(width: proposal.width ?? 220, height: 20)
     }
     @MainActor final class Coordinator: NSObject {
         var parent: AppOutputButton

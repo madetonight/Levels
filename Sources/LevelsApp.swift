@@ -4,6 +4,10 @@ import QuartzCore
 import ServiceManagement
 import SwiftUI
 
+private final class UpdateDotView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
 @main
 enum LevelsApplication {
     @MainActor static func main() {
@@ -25,6 +29,7 @@ final class LevelsDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let closeTransition = PopoverCloseTransition()
     private var outsideClickMonitor: Any?
     private var isShowingOptionsMenu = false
+    private var updateDot: NSView?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let id = Bundle.main.bundleIdentifier,
@@ -43,7 +48,6 @@ final class LevelsDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self.popover.close()
             self.endPresentationSession()
         }
-        options.updates.start()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.autosaveName = "LevelsMixer"
         statusItem = item
@@ -80,6 +84,9 @@ final class LevelsDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         hosting.view.frame.size = NSSize(width: MixerLayout.width, height: MixerLayout.height)
         popover.contentViewController = hosting
         popover.contentSize = NSSize(width: MixerLayout.width, height: MixerLayout.height)
+        options.updates.onAvailabilityChange = { [weak self] in self?.refreshUpdateIndicator() }
+        refreshUpdateIndicator()
+        options.updates.start()
 
         // Keep the menu responsive even if Core Audio is temporarily unavailable.
         Task.detached(priority: .userInitiated) { [engine] in
@@ -91,6 +98,37 @@ final class LevelsDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         return false
+    }
+
+    private func refreshUpdateIndicator() {
+        guard let button = statusItem?.button else { return }
+        // Keep the status item itself and its image unchanged for menu-bar
+        // managers. A tiny noninteractive dot is attached inside its bounds.
+        if options.updates.hasUpdateAvailable {
+            if updateDot == nil {
+                let dot = UpdateDotView(frame: .zero)
+                dot.wantsLayer = true
+                dot.layer?.backgroundColor = NSColor.white.cgColor
+                dot.layer?.cornerRadius = 2
+                dot.layer?.borderWidth = 0.5
+                dot.layer?.borderColor = NSColor.black.withAlphaComponent(0.35).cgColor
+                dot.translatesAutoresizingMaskIntoConstraints = false
+                button.addSubview(dot)
+                updateDot = dot
+                NSLayoutConstraint.activate([
+                    dot.widthAnchor.constraint(equalToConstant: 4), dot.heightAnchor.constraint(equalToConstant: 4),
+                    dot.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -3),
+                    dot.topAnchor.constraint(equalTo: button.topAnchor, constant: 3)
+                ])
+            }
+            button.toolTip = "Levels · Update available"
+            button.setAccessibilityLabel("Levels volume mixer, update available")
+        } else {
+            updateDot?.removeFromSuperview()
+            updateDot = nil
+            button.toolTip = "Levels · Volume mixer"
+            button.setAccessibilityLabel("Levels volume mixer")
+        }
     }
 
     @objc private func togglePopover() {

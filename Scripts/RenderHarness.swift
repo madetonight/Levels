@@ -62,6 +62,7 @@ enum RenderHarness {
         // the real app's settings, login registration, or audio controls.
         let checkDomain = "com.joseluna.levels-render.options-check.\(UUID().uuidString)"
         let checkDefaults = UserDefaults(suiteName: checkDomain)!
+        checkDefaults.set(false, forKey: "SUEnableAutomaticChecks")
         let engine = MixerEngine(defaults: checkDefaults)
         let checkOptions = MixerOptions(engine: engine, defaults: checkDefaults)
         let firstMenu = checkOptions.makeMenu()
@@ -107,6 +108,13 @@ enum RenderHarness {
         engine.setKeepMacMicrophone(false)
         engine.systemVolume.setSoftwareEnabled(false)
         checkDefaults.removePersistentDomain(forName: checkDomain)
+        checkOptions.updates.seedAvailableUpdateForRender(version: "0.1.9", build: "99")
+        let pendingMenu = checkOptions.makeMenu()
+        precondition(pendingMenu.items.contains { $0.title == "Updates · Available" })
+        precondition(pendingMenu.items.first { $0.title == "Updates · Available" }!.submenu!.items.contains { $0.title == "Install Levels 0.1.9…" })
+        precondition(!engine.bluetooth.pairedDeviceAccessEnabled)
+        engine.bluetooth.refresh()
+        precondition(!engine.bluetooth.pairedDeviceAccessEnabled && engine.bluetooth.paired.isEmpty)
         print("Shared options actions, persistence, and checkmarks passed")
         engine.processMonitor.seedForRender(apps: [
             AudioApp(id: -101, bundleID: "com.spotify.client", name: "Spotify", objectIDs: [], isPlaying: true, isRecording: false),
@@ -148,7 +156,9 @@ enum RenderHarness {
                                                    forName: UserDefaults.argumentDomain)
             for dark in [true, false] {
             for (tab, expanded) in [("Output", false), ("Output", true), ("Input", false)] {
-                let view = MixerView(renderTab: tab, renderOtherAppsExpanded: expanded).environment(engine).environment(MixerOptions(engine: engine))
+                let renderOptions = MixerOptions(engine: engine)
+                renderOptions.updates.seedAvailableUpdateForRender(version: "0.1.9", build: "99")
+                let view = MixerView(renderTab: tab, renderOtherAppsExpanded: expanded).environment(engine).environment(renderOptions)
                     .environment(\.colorScheme, dark ? .dark : .light)
                 let hosting = NSHostingView(rootView: view)
                 hosting.frame = NSRect(x: 0, y: 0, width: MixerLayout.width, height: MixerLayout.height)
@@ -167,19 +177,28 @@ enum RenderHarness {
                         .first { $0.accessibilityLabel() == "Output for Spotify" }!
                     let spotify = engine.processMonitor.apps.first { $0.bundleID == "com.spotify.client" }!
                     let volume = engine.volume(for: spotify)
-                    let originalIndex = routeButton.indexOfSelectedItem
+                    let originalIndex = routeButton.itemArray.firstIndex {
+                        ($0.representedObject as? String) == engine.routeUIDs(for: spotify).first
+                    }!
                     print("Native route button:", routeButton.title, routeButton.itemTitles, originalIndex, engine.routeUIDs(for: spotify))
                     fflush(stdout)
                     precondition(routeButton.title == "External Headphones")
-                    precondition(routeButton.itemTitles == ["MacBook Pro Speakers · System default", "MacBook Pro Speakers", "External Headphones"])
-                    routeButton.selectItem(at: 0)
+                    precondition(routeButton.item(at: originalIndex)?.state == .on)
+                    precondition(routeButton.itemTitles == ["External Headphones", "MacBook Pro Speakers · System default", "MacBook Pro Speakers", "External Headphones"])
+                    routeButton.selectItem(at: 1)
                     NSApp.sendAction(routeButton.action!, to: routeButton.target, from: routeButton)
                     precondition(engine.routeUIDs(for: spotify).isEmpty)
+                    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+                    precondition(routeButton.title == "MacBook Pro Speakers")
+                    precondition(routeButton.item(at: 1)?.state == .on)
                     routeButton.selectItem(at: originalIndex)
                     NSApp.sendAction(routeButton.action!, to: routeButton.target, from: routeButton)
                     precondition(engine.routeUIDs(for: spotify) == ["render-headphones"])
+                    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+                    precondition(routeButton.title == "External Headphones")
+                    precondition(routeButton.item(at: originalIndex)?.state == .on)
                     precondition(engine.volume(for: spotify).volume == volume.volume && engine.volume(for: spotify).isMuted == volume.isMuted)
-                    print("Native output button reflects selected device; route actions preserve volume and mute")
+                    print("Output button displays the full selected device name; full menu names and selected-route checkmark verified; route actions preserve volume and mute")
                 }
                 guard let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { fatalError("No bitmap") }
                 hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
