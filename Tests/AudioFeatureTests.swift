@@ -4,6 +4,37 @@ import Testing
 
 @Suite("Audio enhancements: limiter, independent controls, and input policy")
 struct AudioFeatureTests {
+    @Test("Idle incidental apps go in the drawer; paused playback apps remain directly available")
+    func outputSections() {
+        let ids = ["com.apple.finder", "com.timedoctor.desktop", "com.openai.chat", "com.spotify.client", "com.apple.Safari"]
+        let apps = ids.enumerated().map { index, id in
+            AudioApp(id: Int32(index + 1), bundleID: id, name: id, objectIDs: [UInt32(index + 1)],
+                     isPlaying: false, isRecording: id == "com.openai.chat")
+        }
+        let sections = OutputAppSections(apps: apps, recentlyPlaying: [])
+        #expect(Set(sections.primary.map(\.bundleID)) == ["com.spotify.client", "com.apple.Safari"])
+        #expect(Set(sections.other.map(\.bundleID)) == Set(ids.prefix(3)))
+        #expect(sections.primary.count + sections.other.count == apps.count)
+    }
+
+    @Test("Any app producing sound enters the main list, survives short pauses, then returns to the drawer")
+    func incidentalPlaybackPromotion() {
+        var presence = PlaybackPresence()
+        let playing = AudioApp(id: 9, bundleID: "com.openai.chat", name: "ChatGPT", objectIDs: [9],
+                               isPlaying: true, isRecording: false, isPlaybackMeasured: true)
+        var rows = presence.reconcile([playing], runningBundles: [playing.bundleID], now: 0)
+        #expect(OutputAppSections(apps: rows, recentlyPlaying: presence.recentlyPlaying).primary == [playing])
+        rows = presence.reconcile([], runningBundles: [playing.bundleID], now: 1)
+        let pause = OutputAppSections(apps: rows, recentlyPlaying: presence.recentlyPlaying)
+        #expect(pause.primary.count == 1 && pause.other.isEmpty)
+        #expect(pause.primary[0].objectIDs.isEmpty && !pause.primary[0].isPlaying)
+        rows = presence.reconcile([], runningBundles: [playing.bundleID], now: 5)
+        let idle = OutputAppSections(apps: rows, recentlyPlaying: presence.recentlyPlaying)
+        #expect(idle.primary.isEmpty && idle.other.count == 1)
+        rows = presence.reconcile([], runningBundles: [], now: 6)
+        #expect(OutputAppSections(apps: rows, recentlyPlaying: presence.recentlyPlaying).other.isEmpty)
+    }
+
     private func limited(_ input: [Float], channels: Int, gain: Float,
                          limiter: inout PeakLimiter) -> [Float] {
         var output = [Float](repeating: 0, count: input.count)
@@ -168,7 +199,7 @@ struct PlaybackAndResetTests {
         #expect(presence.recentlyPlaying.isEmpty)
     }
 
-    @Test("Pauses update the status immediately but retain a row briefly; ordering never follows activity")
+    @Test("Pauses update status immediately; ordering never follows activity")
     func stableRows() {
         var presence = PlaybackPresence()
         let a = AudioApp(id: 1, bundleID: "a", name: "Alpha", objectIDs: [1], isPlaying: false, isRecording: false)
@@ -179,6 +210,31 @@ struct PlaybackAndResetTests {
         #expect(presence.recentlyPlaying.contains("z"))
         _ = presence.reconcile([idle,a], runningBundles: ["a","z"], now: 5)
         #expect(!presence.recentlyPlaying.contains("z"))
+    }
+
+    @Test("An idle audio app remains visible throughout its open session, then disappears on quit")
+    func idleOpenSession() {
+        var presence = PlaybackPresence()
+        let app = AudioApp(id: 44, bundleID: "player", name: "Player", objectIDs: [10], isPlaying: false, isRecording: false)
+        _ = presence.reconcile([app], runningBundles: ["player"], now: 0)
+        let retained = presence.reconcile([], runningBundles: ["player"], now: 600)
+        #expect(retained.count == 1)
+        #expect(!retained[0].isPlaying && retained[0].objectIDs.isEmpty)
+        #expect(presence.reconcile([], runningBundles: [], now: 601).isEmpty)
+        #expect(presence.reconcile([], runningBundles: ["player"], now: 602).isEmpty)
+    }
+
+    @Test("Multiple idle apps survive helper churn as one row per bundle without stale process IDs")
+    func idleHelperReplacement() {
+        var presence = PlaybackPresence()
+        let a = AudioApp(id: 4, bundleID: "browser", name: "Browser", objectIDs: [1], isPlaying: false, isRecording: false)
+        let b = AudioApp(id: 5, bundleID: "player", name: "Player", objectIDs: [2], isPlaying: false, isRecording: false)
+        _ = presence.reconcile([b,a], runningBundles: ["browser","player"], now: 0)
+        #expect(presence.reconcile([], runningBundles: ["browser","player"], now: 90).map(\.bundleID) == ["browser","player"])
+        let replacement = AudioApp(id: 4, bundleID: "browser", name: "Browser", objectIDs: [9], isPlaying: true, isRecording: false)
+        let rows = presence.reconcile([replacement], runningBundles: ["browser","player"], now: 91)
+        #expect(rows.count == 2 && rows[0].objectIDs == [9] && rows[0].isPlaying)
+        #expect(rows[1].objectIDs.isEmpty && !rows[1].isPlaying)
     }
 
     @Test("Reset level defaults to unity, persists, and only changes one app's level")

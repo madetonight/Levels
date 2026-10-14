@@ -79,11 +79,6 @@ enum RenderHarness {
         precondition(!settingsWindow.isVisible && settingsWindow.title == "Levels Settings")
         precondition(checkOptions.prepareSettingsWindow() === settingsWindow)
         precondition(!settingsWindow.isReleasedWhenClosed)
-        precondition(!checkOptions.showIdleApps)
-        checkOptions.showIdleApps = true
-        precondition(checkDefaults.bool(forKey: "LevelsShowInactiveAudioApps"))
-        precondition(MixerOptions(engine: engine, defaults: checkDefaults).showIdleApps)
-        checkOptions.showIdleApps = false
         let surfaceChoices = appearanceChoices
         surfaceChoices.performActionForItem(at: surfaceChoices.items.firstIndex { $0.title == "Liquid Glass" }!)
         let secondMenu = checkOptions.makeMenu()
@@ -116,7 +111,9 @@ enum RenderHarness {
         engine.processMonitor.seedForRender(apps: [
             AudioApp(id: -101, bundleID: "com.spotify.client", name: "Spotify", objectIDs: [], isPlaying: true, isRecording: false),
             AudioApp(id: -102, bundleID: "com.apple.Safari", name: "Safari", objectIDs: [], isPlaying: true, isRecording: false),
-            AudioApp(id: -103, bundleID: "com.hnc.Discord", name: "Discord", objectIDs: [], isPlaying: false, isRecording: false)
+            AudioApp(id: -103, bundleID: "com.hnc.Discord", name: "Discord", objectIDs: [], isPlaying: false, isRecording: false),
+            AudioApp(id: -104, bundleID: "com.apple.finder", name: "Finder", objectIDs: [], isPlaying: false, isRecording: false),
+            AudioApp(id: -105, bundleID: "com.openai.chat", name: "ChatGPT", objectIDs: [], isPlaying: false, isRecording: false)
         ])
         engine.seedForRender(volumes: ["com.spotify.client": AppVolume(volume: 0.42, outputDeviceUIDs: ["render-headphones"]),
                                       "com.apple.Safari": AppVolume(volume: 1.84, outputDeviceUIDs: ["render-speakers"]),
@@ -150,8 +147,8 @@ enum RenderHarness {
             UserDefaults.standard.setVolatileDomain(["LevelsMixerAppearance": "System", "LevelsMixerSurface": surface],
                                                    forName: UserDefaults.argumentDomain)
             for dark in [true, false] {
-            for tab in ["Output", "Input"] {
-                let view = MixerView(renderTab: tab).environment(engine).environment(MixerOptions(engine: engine))
+            for (tab, expanded) in [("Output", false), ("Output", true), ("Input", false)] {
+                let view = MixerView(renderTab: tab, renderOtherAppsExpanded: expanded).environment(engine).environment(MixerOptions(engine: engine))
                     .environment(\.colorScheme, dark ? .dark : .light)
                 let hosting = NSHostingView(rootView: view)
                 hosting.frame = NSRect(x: 0, y: 0, width: MixerLayout.width, height: MixerLayout.height)
@@ -162,10 +159,32 @@ enum RenderHarness {
                 hosting.layoutSubtreeIfNeeded()
                 RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.15))
                 hosting.layoutSubtreeIfNeeded()
+                if surface == "Sage mesh", dark, tab == "Output", !expanded {
+                    func descendants(_ view: NSView) -> [NSView] {
+                        [view] + view.subviews.flatMap(descendants)
+                    }
+                    let routeButton = descendants(hosting).compactMap { $0 as? NSPopUpButton }
+                        .first { $0.accessibilityLabel() == "Output for Spotify" }!
+                    let spotify = engine.processMonitor.apps.first { $0.bundleID == "com.spotify.client" }!
+                    let volume = engine.volume(for: spotify)
+                    let originalIndex = routeButton.indexOfSelectedItem
+                    print("Native route button:", routeButton.title, routeButton.itemTitles, originalIndex, engine.routeUIDs(for: spotify))
+                    fflush(stdout)
+                    precondition(routeButton.title == "External Headphones")
+                    precondition(routeButton.itemTitles == ["MacBook Pro Speakers · System default", "MacBook Pro Speakers", "External Headphones"])
+                    routeButton.selectItem(at: 0)
+                    NSApp.sendAction(routeButton.action!, to: routeButton.target, from: routeButton)
+                    precondition(engine.routeUIDs(for: spotify).isEmpty)
+                    routeButton.selectItem(at: originalIndex)
+                    NSApp.sendAction(routeButton.action!, to: routeButton.target, from: routeButton)
+                    precondition(engine.routeUIDs(for: spotify) == ["render-headphones"])
+                    precondition(engine.volume(for: spotify).volume == volume.volume && engine.volume(for: spotify).isMuted == volume.isMuted)
+                    print("Native output button reflects selected device; route actions preserve volume and mute")
+                }
                 guard let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { fatalError("No bitmap") }
                 hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
                 guard let data = bitmap.representation(using: .png, properties: [:]) else { fatalError("No PNG") }
-                let name = "levels-\(surface == "Sage mesh" ? "mesh" : "glass")-\(dark ? "dark" : "light")-\(tab.lowercased().replacingOccurrences(of: " ", with: "-")).png"
+                let name = "levels-\(surface == "Sage mesh" ? "mesh" : "glass")-\(dark ? "dark" : "light")-\(tab.lowercased().replacingOccurrences(of: " ", with: "-"))\(expanded ? "-expanded" : "").png"
                 try data.write(to: output.appendingPathComponent(name))
                 print(name)
                 window.contentView = nil

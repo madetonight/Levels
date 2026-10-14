@@ -11,3 +11,12 @@
 Physical HDMI/DisplayPort keyboard controls, Bluetooth quality, and broader device/sleep/wake tests remain pending. A fresh first launch on another Mac is unverified; unnotarized browser downloads may require Apple's per-app Open Anyway approval. Source/build/signature checks do not remove that requirement.
 
 Live in-app update verified: an older connected 0.1.5 build checked the public feed, downloaded, installed, and relaunched the exact 0.1.6 Release executable. Strict signatures and saved volume/mute/routing/appearance choices remained intact. The four public release assets matched their local bytes; the deployed public feed matched the generated XML.
+
+
+## Levels 0.1.7 / build 9 — compact mixer
+
+Optimized arm64 Release build and strict nested signatures passed. 86 tests in 20 suites passed. Native dark/light Solid/Glass Output and Input renders were inspected. An isolated native popup-button check verified selected-device labels, full menu choices, routing actions, and unchanged app volume/mute settings. The Settings window passed three open/close/reopen cycles.
+
+Output controls use a thin flat button surface instead of the system's large rounded bezel. Master/input percentages sit directly beside their sliders. Shorter slider travel, slightly thicker tracks/thumbs, compact aligned rows, selected-device labels, hidden scroll indicators, and the collapsed Other apps drawer are included. Known audio apps retain session presence without stale process IDs. Audio processing and permissions are unchanged.
+
+Physical monitor, Bluetooth, sleep/wake, and another-Mac first-launch behavior still need broader beta testing. The beta remains sandboxed and ad-hoc signed, with no Gatekeeper bypass. Update archive signing and public-feed verification are performed before rollout.

@@ -1,19 +1,21 @@
-# Levels 0.1.6 beta
+# Levels 0.1.7 beta
 
-A cleaner menu-bar mixer with independent app reset and more accurate playback status.
+A compact mixer with thinner output buttons, shorter sliders, and a quieter app list.
 
 ## What changed
 
-- Reset below each app slider, on the right. Choose its default level in Settings → App volumes; it starts at 100%. Reset preserves mute and output choices.
-- Minimal Output and Input tabs without divider lines or the app counter.
-- Playing now uses real audio signal activity when measurement is available. Silent open streams show Idle; if measurement is unavailable, the honest fallback is Output active.
-- Short pauses and browser audio-helper replacements retain the row briefly. Alphabetical ordering keeps apps from jumping when playback changes.
-- A dedicated Settings window for device selection, login, inactive apps, monitor volume, Bluetooth microphone preference, and reset preferences. Appearance and Updates remain in the Options menu.
-- Per-app boost up to 200% with a peak limiter; optional software volume and keyboard support for fixed HDMI/DisplayPort outputs; optional Mac microphone preference for Bluetooth headphones.
+- Thin, flat output buttons show each app's selected device. Full names and the system-default choice remain available in the native menu and tooltip.
+- Smaller master-volume and microphone-gain percentages sit directly beside their sliders.
+- Compact, aligned app rows with a reset icon on the right of the slider. Reset restores the level from Settings (100% initially), preserving mute and output choices.
+- Shorter slider travel, with a slightly thicker track and thumb. Per-app range remains 0–200%, with limiting above 100%.
+- Browsers and common playback apps remain directly available. Other idle audio processes appear in a collapsed Other apps drawer; producing sound promotes an app into the main list, with a short grace period to avoid flicker.
+- Known apps remain available throughout their open session even if an audio helper disappears. Cached helpers cannot create controls for obsolete process IDs.
+- Scrolling works without visible scrollbars. The redundant inactive-app preference is removed.
+- The master output uses the matching device symbol; MacBook speakers use a laptop icon.
 
 ## Install or update
 
-Already using the connected beta (0.1.5)? Choose Options → Updates → Check for Updates. Daily checks are optional, and installation requires your approval. Saved volume, mute, routing, and appearance choices are retained. Update archives are verified with Levels' dedicated signing key.
+Already using a connected beta (0.1.5 or later)? Choose Options → Updates → Check for Updates. Daily checks are optional, and installation requires your approval. Saved volume, mute, routing, and appearance choices are retained. Update archives are verified with Levels' dedicated signing key.
 
 First install: download the beta DMG, drag Levels to Applications, eject the image, and open Levels. The DMG includes an Open Privacy & Security shortcut to make Apple's first-launch approval easier to reach. Levels lives in the menu bar; Settings opens only when requested.
 
