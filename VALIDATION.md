@@ -34,3 +34,11 @@ Published v0.1.7-beta from source commit 0c3e04e. Four public release assets wer
 Full selected-device names, inline Playing/Idle status, aligned percentages, and gentle update-available indicators are included. Native menu and output selection actions and three Settings open/close/reopen cycles passed. Scheduled update checks preserve existing opt-outs; installation remains user-approved. Paired Bluetooth access is deferred to an explicit connection action.
 
 Owner beta builds now retain the approved Apple Development signing identity; the first identity transition may require audio permission once. Strict signatures and the app sandbox remain enabled. This does not provide Developer ID or Apple notarization; another-Mac first launch, external monitor/Bluetooth hardware and broader sleep/wake listening tests remain pending.
+
+
+### Published update verification
+
+Published v0.1.8-beta from source commit f851ee0. All four public release assets matched local bytes and lengths. The deployed HTTPS appcast matched the generated signed feed exactly; public archive Ed25519 verification passed and modified bytes were rejected. A read-only inspection of the beta DMG confirmed that it contains the exact fixed build 12 executable.
+
+An isolated real 0.1.7 app checked the public feed and installed/relaunched 0.1.8/build 12. Installed executable bytes matched the final Release app; strict nested signatures and the stable certificate designated requirement passed. Saved app volume, mute, routing, feature and appearance choices were unchanged. The final shipping app was restored to the normal project build location and launched as a menu-bar app. Broader hardware listening and sleep/wake testing remain pending.
+
