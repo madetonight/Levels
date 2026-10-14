@@ -20,3 +20,8 @@ Optimized arm64 Release build and strict nested signatures passed. 86 tests in 2
 Output controls use a thin flat button surface instead of the system's large rounded bezel. Master/input percentages sit directly beside their sliders. Shorter slider travel, slightly thicker tracks/thumbs, compact aligned rows, selected-device labels, hidden scroll indicators, and the collapsed Other apps drawer are included. Known audio apps retain session presence without stale process IDs. Audio processing and permissions are unchanged.
 
 Physical monitor, Bluetooth, sleep/wake, and another-Mac first-launch behavior still need broader beta testing. The beta remains sandboxed and ad-hoc signed, with no Gatekeeper bypass. Update archive signing and public-feed verification are performed before rollout.
+
+
+### Published update verification
+
+Published v0.1.7-beta from source commit 0c3e04e. Four public release assets were downloaded without credentials and matched their local package bytes and lengths. The live HTTPS appcast matched the signed generated XML exactly. An isolated 0.1.6/build 7 app using the shipping Sparkle runtime checked, downloaded, installed and relaunched 0.1.7/build 9. Installed executable bytes matched the final Release app; strict signatures passed. Saved app volume, mute, routing, feature and appearance choices were preserved. Device last-used timestamps refreshed normally on relaunch. The exact shipping app was restored to the normal project build location. Physical hardware and another-Mac first-launch checks remain pending.
