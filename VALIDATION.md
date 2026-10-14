@@ -51,3 +51,9 @@ An isolated real 0.1.7 app checked the public feed and installed/relaunched 0.1.
 The watchdog distinguishes a paused source from failing active playback, provides a fresh resume grace period and waits longer for initial driver callbacks. Genuine failures restore native playback and retry independently per app with delays capped at 30 seconds. Helper replacement can reconnect immediately; obsolete retries are cancelled across reset, quit and sleep. Checking runs at 250 ms instead of 100 ms.
 
 Optimized arm64 Release build, strict nested signatures and DMG checksums passed. The owner signing identity, sandbox and update verification configuration remain unchanged from 0.1.8. Broader physical-device listening and sleep/wake tests remain pending.
+
+
+### Published update verification
+
+Published v0.1.9-beta from source commit 4795ac0. Four public assets matched their tested local bytes and lengths. The live HTTPS appcast matched the generated signed XML exactly. Public archive Ed25519 verification passed and modified bytes were rejected. A read-only DMG inspection confirmed the exact fixed build 13 executable. The same certificate-signed shipping app was restored to the normal project build location and confirmed running. Native pause/resume, active-stall and automatic-recovery results are retained in the project; live Spotify listening and broader hardware checks remain pending.
+
