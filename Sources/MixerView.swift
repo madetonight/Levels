@@ -4,14 +4,29 @@ import ServiceManagement
 import SwiftUI
 
 enum MixerLayout {
-    static let width: CGFloat = 320
-    static let height: CGFloat = 560
-    static let tabsWidth: CGFloat = 200
-    static let appSliderWidth: CGFloat = 180
-    static let systemSliderWidth: CGFloat = 210
-    static let levelWidth: CGFloat = 42
+    static let width: CGFloat = 296
+    static let height: CGFloat = 500
+    static let tabsWidth: CGFloat = 190
+    static let appSliderWidth: CGFloat = 170
+    static let systemSliderWidth: CGFloat = 200
+    static let levelWidth: CGFloat = 40
     static let actionWidth: CGFloat = 28
     static let controlGap: CGFloat = 4
+    static let panelInset: CGFloat = 12
+
+    @MainActor static var outputFont: NSFont { .systemFont(ofSize: 11, weight: .regular) }
+    @MainActor static func outputButtonSize(title: String) -> CGSize {
+        let attributes: [NSAttributedString.Key: Any] = [.font: outputFont]
+        let titleWidth = ceil((title as NSString).size(withAttributes: attributes).width)
+        // Native title insets plus disclosure arrow; keep the button snug.
+        let chrome: CGFloat = 30
+        let available = width - panelInset * 2 - actionWidth * 2 - controlGap * 3 - 10
+        let buttonWidth = min(available, max(72, titleWidth + chrome))
+        let textBounds = (title as NSString).boundingRect(
+            with: CGSize(width: buttonWidth - chrome, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes)
+        return CGSize(width: buttonWidth, height: max(20, ceil(textBounds.height) + 6))
+    }
 }
 
 private enum MixerTab: String, CaseIterable {
@@ -360,7 +375,7 @@ struct MixerView: View {
     var body: some View {
         decoratedPanel
             // SwiftUI's default system design uses San Francisco on macOS.
-            .font(.system(size: 12, design: .default))
+            .font(.system(size: 11.5, design: .default))
             .fontDesign(.default)
             .tint(palette.fill)
             .environment(\.colorScheme, scheme)
@@ -400,9 +415,9 @@ struct MixerView: View {
 
     private var panel: some View {
         VStack(spacing: 0) {
-            header.padding(.bottom, 14)
-            tabs.padding(.bottom, 16)
-            systemCard.padding(.bottom, 14)
+            header.padding(.bottom, 10)
+            tabs.padding(.bottom, 12)
+            systemCard.padding(.bottom, 10)
             Group {
                 if !engine.isStarted {
                     emptyState("Connecting to audio", subtitle: "Waiting for the Mac’s audio system…", icon: "waveform")
@@ -420,7 +435,7 @@ struct MixerView: View {
                 Text(error).font(.caption).foregroundStyle(.red).padding(.top, 8)
             }
         }
-        .padding(.horizontal, 18).padding(.top, 18).padding(.bottom, 14)
+        .padding(.horizontal, MixerLayout.panelInset).padding(.top, 12).padding(.bottom, 10)
         .frame(width: MixerLayout.width, height: MixerLayout.height)
         .foregroundStyle(palette.text)
     }
@@ -428,9 +443,9 @@ struct MixerView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Image(systemName: "slider.vertical.3")
-                .font(.system(size: 17, weight: .regular)).frame(width: 20)
+                .font(.system(size: 16, weight: .regular)).frame(width: 19)
                 .accessibilityHidden(true)
-            Text("Levels").font(.system(size: 20, weight: .semibold)).tracking(-0.8)
+            Text("Levels").font(.system(size: 19, weight: .semibold)).tracking(-0.8)
             Spacer()
             optionsMenu
         }
@@ -461,7 +476,7 @@ struct MixerView: View {
                             .font(.system(size: 15)).frame(width: 24, height: 24)
                             .accessibilityHidden(true)
                         Text(controller.deviceName.isEmpty ? "No device available" : controller.deviceName)
-                            .font(.system(size: 12, weight: .medium, design: .default)).lineLimit(1)
+                            .font(.system(size: 11.5, weight: .medium, design: .default)).lineLimit(1)
                             .contextMenu {
                                 Button(controller.isMuted ? "Unmute device" : "Mute device") { controller.toggleMute() }
                                     .disabled(!controller.canMute || !engine.isStarted)
@@ -478,7 +493,7 @@ struct MixerView: View {
                     .disabled(!controller.canSetVolume || !engine.isStarted)
                     .opacity(controller.isMuted ? 0.5 : 1)
                 Text("\(Int((controller.volume * 100).rounded()))%")
-                    .font(.system(size: 16, weight: .semibold, design: .default)).monospacedDigit()
+                    .font(.system(size: 15, weight: .semibold, design: .default)).monospacedDigit()
                     .frame(width: MixerLayout.levelWidth, alignment: .trailing)
                     .foregroundStyle(controller.isMuted ? palette.secondary : palette.text)
                 Color.clear.frame(width: MixerLayout.actionWidth + MixerLayout.controlGap, height: 20)
@@ -500,7 +515,7 @@ struct MixerView: View {
                     Text(item.rawValue)
                         .font(.system(size: 11, weight: tab == item ? .semibold : .medium))
                         .foregroundStyle(tab == item ? palette.text : palette.secondary)
-                        .frame(maxWidth: .infinity).frame(height: 26)
+                        .frame(maxWidth: .infinity).frame(height: 24)
                         .background {
                             if tab == item {
                                 Capsule()
@@ -564,15 +579,15 @@ struct MixerView: View {
                            icon: "waveform")
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 4) {
                         ForEach(sections.primary, id: \.bundleID) { app in AppLevelRow(app: app, palette: palette) }
                         if !sections.other.isEmpty {
                             DisclosureGroup(isExpanded: $otherAppsExpanded) {
-                                VStack(spacing: 8) {
+                                VStack(spacing: 4) {
                                     ForEach(sections.other, id: \.bundleID) { app in
                                         AppLevelRow(app: app, palette: palette)
                                     }
-                                }.padding(.top, 8)
+                                }.padding(.top, 4)
                             } label: {
                                 Text("Other apps")
                                     .font(.system(size: 11, weight: .medium))
@@ -707,10 +722,10 @@ private struct AppLevelRow: View {
         let error = engine.tapErrors[app.bundleID]
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 9) {
-                Image(nsImage: app.icon).resizable().interpolation(.high).frame(width: 24, height: 24)
+                Image(nsImage: app.icon).resizable().interpolation(.high).frame(width: 22, height: 22)
                     .accessibilityHidden(true)
                 HStack(alignment: .center, spacing: 8) {
-                    Text(app.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    Text(app.name).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
                         .layoutPriority(1)
                     HStack(spacing: 5) {
                         Circle().fill(palette.fill.opacity(volume.isMuted ? 0.35 : 0.65)).frame(width: 4, height: 4)
@@ -720,13 +735,6 @@ private struct AppLevelRow: View {
                     }
                 }
                 Spacer(minLength: 3)
-                Button { engine.toggleMute(for: app) } label: {
-                    Image(systemName: volume.isMuted ? "speaker.slash" : "speaker.wave.2")
-                        .font(.system(size: 13)).frame(width: MixerLayout.actionWidth, height: 28)
-                        .foregroundStyle(palette.secondary)
-                        .background(volume.isMuted ? palette.button : Color.clear, in: RoundedRectangle(cornerRadius: 7))
-                }.buttonStyle(.plain)
-                .accessibilityLabel("\(volume.isMuted ? "Unmute" : "Mute") \(app.name)")
             }
             HStack(spacing: MixerLayout.controlGap) {
                 MixerVolumeSlider(value: Binding(get: { engine.volume(for: app).volume }, set: { engine.setVolume($0, for: app) }),
@@ -736,7 +744,7 @@ private struct AppLevelRow: View {
                     .help("0–200%. Boost above 100% uses a peak limiter to prevent digital clipping.")
                 Spacer(minLength: 4)
                 Text("\(Int((volume.volume * 100).rounded()))%")
-                    .font(.system(size: 12, weight: .medium)).monospacedDigit()
+                    .font(.system(size: 11.5, weight: .medium)).monospacedDigit()
                     .frame(width: MixerLayout.levelWidth, alignment: .trailing)
                     .foregroundStyle(volume.volume > 1 ? Color.orange : palette.secondary)
                 Color.clear.frame(width: MixerLayout.actionWidth, height: 20)
@@ -745,6 +753,15 @@ private struct AppLevelRow: View {
             HStack(spacing: MixerLayout.controlGap) {
                 outputSelector.padding(.leading, 6)
                 Spacer(minLength: 4)
+                Button { engine.toggleMute(for: app) } label: {
+                    Image(systemName: volume.isMuted ? "speaker.slash" : "speaker.wave.2")
+                        .font(.system(size: 13)).frame(width: MixerLayout.actionWidth, height: 28)
+                        .foregroundStyle(palette.secondary)
+                        .background(volume.isMuted ? palette.button : Color.clear, in: RoundedRectangle(cornerRadius: 7))
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                    .accessibilityLabel("\(volume.isMuted ? "Unmute" : "Mute") \(app.name)")
+                    .help("\(volume.isMuted ? "Unmute" : "Mute") \(app.name)")
                 Button { engine.resetLevel(for: app) } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 14, weight: .medium))
@@ -759,7 +776,6 @@ private struct AppLevelRow: View {
                 Text(error).font(.system(size: 10)).foregroundStyle(.orange).lineLimit(2)
             }
         }
-         .padding(.vertical, 2)
         .contextMenu {
             Button("Reset level to \(Int((engine.appResetLevel * 100).rounded()))%") { engine.resetLevel(for: app) }
             Button("Restore original volume and output") { engine.reset(app) }
@@ -774,6 +790,7 @@ private struct AppLevelRow: View {
         let selectedName = devices.first { $0.uid == selectedUID }?.name ?? systemName
         let outputDescription = unavailable ? "Selected device unavailable · using \(systemName)"
             : (selectedUID.isEmpty ? "System default · \(selectedName)" : selectedName)
+        let size = MixerLayout.outputButtonSize(title: selectedName)
         return AppOutputButton(selection: Binding(
                 get: { engine.routeUIDs(for: app).first ?? "" },
                 set: { uid in
@@ -784,7 +801,7 @@ private struct AppLevelRow: View {
                 }
             ), devices: devices, systemName: systemName, title: selectedName,
             label: "Output for \(app.name)", detail: outputDescription)
-        .frame(width: 220, height: 20)
+        .frame(width: size.width, height: size.height)
         .background(palette.button.opacity(0.18), in: RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(palette.line.opacity(0.7), lineWidth: 0.5))
         .disabled(!engine.isStarted)
@@ -808,14 +825,16 @@ private struct AppOutputButton: NSViewRepresentable {
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: true)
         button.controlSize = .mini
-        button.font = .systemFont(ofSize: 11, weight: .regular)
+        button.font = MixerLayout.outputFont
         button.bezelStyle = .rounded
         // The system's rounded bezel keeps a large glass silhouette even for
         // mini controls. SwiftUI supplies a thin, fixed-height button surface;
         // AppKit still owns the popup menu, selection, focus and keyboard input.
         button.isBordered = false
         button.focusRingType = .exterior
-        button.cell?.lineBreakMode = .byTruncatingMiddle
+        button.cell?.usesSingleLineMode = false
+        button.cell?.wraps = true
+        button.cell?.lineBreakMode = .byWordWrapping
         button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         button.target = context.coordinator
         button.action = #selector(Coordinator.changed(_:))
@@ -852,7 +871,7 @@ private struct AppOutputButton: NSViewRepresentable {
         button.setAccessibilityValue(detail)
     }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? 220, height: 20)
+        MixerLayout.outputButtonSize(title: title)
     }
     @MainActor final class Coordinator: NSObject {
         var parent: AppOutputButton

@@ -4,7 +4,7 @@ A native macOS menu bar volume mixer. Its audio engine is adapted from [Fader](h
 
 ## Try it
 
-Source, assets, tests, scripts, documentation, and distributable builds are maintained in this project. Download the [latest sample beta](https://github.com/madetonight/Levels/releases/tag/v0.1.6-beta), or build locally with the scripts below.
+Source, assets, tests, scripts, documentation, and distributable builds are maintained in this project. Download the [latest sample beta](https://github.com/madetonight/Levels/releases/tag/v0.1.10-beta), or build locally with the scripts below.
 
 Open `dist/Levels.app`. Left-click the three-fader icon in the menu bar to open the panel. Right-click that icon, or click the panel's top-right three-dot Options button, for the same appearance, surface, settings, and Quit menu.
 
@@ -61,11 +61,11 @@ To build the optimized Apple silicon release and its drag-to-Applications disk i
 ./Scripts/package-dmg.sh
 ```
 
-This preserves the regular development build, places the optimized app and ZIP in `dist/Release/`, and creates `dist/Levels-0.1.9-arm64.dmg`. The image includes the app, an Applications shortcut, install/privacy notes, and MIT attribution. The owner beta has an Apple Development signature, but no Developer ID distribution signature or Apple notarization. First-launch Gatekeeper approval can still be required. Do not describe it as a notarized public installer. Package measurements and verification results are in `dist/Beta/package-details.json`.
+This preserves the regular development build, places the optimized app and ZIP in `dist/Release/`, and creates `dist/Levels-0.1.10-arm64.dmg`. The image includes the app, an Applications shortcut, install/privacy notes, and MIT attribution. The owner beta has an Apple Development signature, but no Developer ID distribution signature or Apple notarization. First-launch Gatekeeper approval can still be required. Do not describe it as a notarized public installer. Package measurements and verification results are in `dist/Beta/package-details.json`.
 
 ## Downloadable beta
 
-[Download Levels 0.1.9 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.9-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
+[Download Levels 0.1.10 beta](https://github.com/madetonight/Levels/releases/tag/v0.1.10-beta). This is an unnotarized Apple silicon build and includes first-launch instructions.
 
 Run `Scripts/package-beta.sh` to package the existing optimized app in `dist/Release/Levels.app` as a clearly labeled, unnotarized beta. After source changes, rebuild with `Scripts/package-dmg.sh` first. The beta DMG, app-only ZIP, portable checksums, release notes, and package measurements are kept in `dist/Beta/`. See BETA.md for publishing and installation validation.
 
@@ -87,7 +87,7 @@ Pauses and audio-helper replacement retain a row while its app remains open; its
 
 ## Updates
 
-Options → Updates contains Check for Updates and Automatically check for updates. The same submenu is available from the menu-bar icon's right-click menu. Automatic checking defaults off and is remembered. Starting with 0.1.5, the app checks the public [update feed](https://madetonight.github.io/Levels/appcast.xml). Install this first connected beta manually if upgrading from 0.1.4 or earlier. Future updates are offered inside Levels, with signed archives and approval before installation. See [UPDATES.md](UPDATES.md) for the release process.
+Options → Updates contains Check for Updates and Automatically check for updates. The same submenu is available from the menu-bar icon's right-click menu. Automatic checking defaults on for new installs; saved opt-outs are preserved. Starting with 0.1.5, the app checks the public [update feed](https://madetonight.github.io/Levels/appcast.xml). Install this first connected beta manually if upgrading from 0.1.4 or earlier. Future updates are offered inside Levels, with signed archives and approval before installation. See [UPDATES.md](UPDATES.md) for the release process.
 
 `madetonight/Levels` is public and is the selected beta release location. A later switch to private requires moving the feed and archives to a public host first. No GitHub access token is embedded. The two app-scoped Sparkle installer sandbox exceptions are applied with explicit user approval; the sandbox remains enabled. See `Resources/Sparkle-Installer-Permissions.patch` for the exact change and `UPDATES.md` for the publishing workflow. Developer ID signing and notarization are optional for publishing this zero-budget beta, but required for normal first-launch acceptance under Gatekeeper.
 

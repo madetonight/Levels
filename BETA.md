@@ -1,6 +1,6 @@
 # Zero-budget Levels beta
 
-The current downloadable beta is 0.1.9/build 13, Apple silicon, macOS 15+. It uses the verified optimized Release app, an owner-approved Apple Development certificate, and no Apple notarization. Publishing this beta does not require paid Apple Developer membership. Self-signed or Sparkle update signatures do not create Gatekeeper trust.
+The current downloadable beta is 0.1.10/build 14, Apple silicon, macOS 15+. It uses the verified optimized Release app, an owner-approved Apple Development certificate, and no Apple notarization. Publishing this beta does not require paid Apple Developer membership. Self-signed or Sparkle update signatures do not create Gatekeeper trust.
 
 The certificate selection is kept in the ignored local `.release-signing` file.
 The private key stays in Keychain. Keep the same identity for later owner releases;
@@ -15,11 +15,11 @@ The output in dist/Beta contains the drag-to-Applications DMG, app-only ZIP, SHA
 
 ## Published release
 
-The updated sample is prepared as v0.1.9-beta. Publish its verified DMG, ZIP, and checksums at https://github.com/madetonight/Levels/releases/tag/v0.1.9-beta. No signing key or credential belongs in the repository.
+The updated sample is prepared as v0.1.10-beta. Publish its verified DMG, ZIP, and checksums at https://github.com/madetonight/Levels/releases/tag/v0.1.10-beta. No signing key or credential belongs in the repository.
 
 For subsequent releases:
 
-Use the public `madetonight/Levels` repository. Create a GitHub release tagged `v0.1.9-beta`, title `Levels 0.1.9 beta`, and mark it as a pre-release. Use dist/Beta/RELEASE-NOTES.md for the description. Upload the DMG, optional ZIP, and SHA256SUMS.txt. Publishing binaries does not require uploading local source or developer credentials. Keep the beta label and unnotarized-install notice visible next to the download.
+Use the public `madetonight/Levels` repository. Create a GitHub release tagged `v0.1.10-beta`, title `Levels 0.1.10 beta`, and mark it as a pre-release. Use dist/Beta/RELEASE-NOTES.md for the description. Upload the DMG, optional ZIP, and SHA256SUMS.txt. Publishing binaries does not require uploading local source or developer credentials. Keep the beta label and unnotarized-install notice visible next to the download.
 
 ## Verify a fresh installation
 

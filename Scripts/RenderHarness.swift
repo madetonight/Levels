@@ -191,6 +191,15 @@ enum RenderHarness {
                     RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
                     precondition(routeButton.title == "MacBook Pro Speakers")
                     precondition(routeButton.item(at: 1)?.state == .on)
+                    let titleWidth = (routeButton.title as NSString).size(withAttributes: [.font: routeButton.font!]).width
+                    let titleRect = routeButton.cell!.titleRect(forBounds: routeButton.bounds)
+                    precondition(routeButton.bounds.width < 190)
+                    precondition(titleRect.width >= titleWidth)
+                    print("Compact selector:", routeButton.bounds.size, "title width:", titleWidth, "title rect:", titleRect)
+                    let longName = "Studio headphones connected through the external audio interface"
+                    let wrappedSize = MixerLayout.outputButtonSize(title: longName)
+                    precondition(wrappedSize.height > 20 && wrappedSize.width <= 194)
+                    precondition(hosting.bounds.size == CGSize(width: 296, height: 500))
                     routeButton.selectItem(at: originalIndex)
                     NSApp.sendAction(routeButton.action!, to: routeButton.target, from: routeButton)
                     precondition(engine.routeUIDs(for: spotify) == ["render-headphones"])
@@ -198,6 +207,19 @@ enum RenderHarness {
                     precondition(routeButton.title == "External Headphones")
                     precondition(routeButton.item(at: originalIndex)?.state == .on)
                     precondition(engine.volume(for: spotify).volume == volume.volume && engine.volume(for: spotify).isMuted == volume.isMuted)
+                    let longHeadphones = AudioDevice(id: headphones.id, uid: headphones.uid, name: longName,
+                        transport: headphones.transport, outputDataSource: 0, inputDataSource: 0)
+                    engine.deviceMonitor.seedForRender(devices: [speakers, longHeadphones], defaultDeviceID: 1)
+                    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
+                    hosting.layoutSubtreeIfNeeded()
+                    let wrappedTitleRect = routeButton.cell!.titleRect(forBounds: routeButton.bounds)
+                    print("Long output title:", routeButton.bounds.size, wrappedTitleRect)
+                    let longBitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds)!
+                    hosting.cacheDisplay(in: hosting.bounds, to: longBitmap)
+                    try longBitmap.representation(using: .png, properties: [:])!.write(to: output.appendingPathComponent("levels-long-output-name.png"))
+                    engine.deviceMonitor.seedForRender(devices: [speakers, headphones], defaultDeviceID: 1)
+                    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
+                    hosting.layoutSubtreeIfNeeded()
                     print("Output button displays the full selected device name; full menu names and selected-route checkmark verified; route actions preserve volume and mute")
                 }
                 guard let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { fatalError("No bitmap") }

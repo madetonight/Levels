@@ -1,4 +1,4 @@
-LEVELS 0.1.9 — PUBLIC BETA (NOT NOTARIZED)
+LEVELS 0.1.10 — PUBLIC BETA (NOT NOTARIZED)
 
 A menu-bar volume mixer for your Mac.
 
@@ -22,7 +22,7 @@ Use Options → Settings → Devices to choose the Mac's default output.
 Each application's slider adjusts its volume; its speaker button toggles mute.
 Use the selected-device button below an app's slider to choose where it plays.
 Different apps can play through different outputs simultaneously. Each app has
-a reset icon on the right of its slider. It restores the default level
+mute and reset icons together below its slider, on the right. It restores the default level
 chosen in Settings → App volumes (100% initially), preserving mute and output.
 Other idle audio apps are tucked into the Other apps drawer. Scrolling remains
 available without a visible scrollbar.

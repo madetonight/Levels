@@ -57,3 +57,12 @@ Optimized arm64 Release build, strict nested signatures and DMG checksums passed
 
 Published v0.1.9-beta from source commit 4795ac0. Four public assets matched their tested local bytes and lengths. The live HTTPS appcast matched the generated signed XML exactly. Public archive Ed25519 verification passed and modified bytes were rejected. A read-only DMG inspection confirmed the exact fixed build 13 executable. The same certificate-signed shipping app was restored to the normal project build location and confirmed running. Native pause/resume, active-stall and automatic-recovery results are retained in the project; live Spotify listening and broader hardware checks remain pending.
 
+
+
+## 2026-10-16 — Compact 0.1.10 layout
+
+- Approved 296 × 500 point mixer, with 12-point side padding and tighter app spacing. Existing readable typography, slider travel and aligned percentage columns are retained.
+- Native output buttons size to their full device names; longer names wrap. Mute and reset are together below each slider, with accessible action labels.
+- All 95 regression tests in 21 suites passed. Native render/control harness checked dark/light, Solid/Liquid Glass, long device names, route selection without changing volume/mute, and three Settings open/close cycles.
+- Release build and strict signature checks passed. Beta DMG and signed updater archive use the same Release app and existing owner-approved certificate. No audio-engine, permission, or preference behavior changed.
+- Hardware listening tests and installation on another Mac remain separate pending checks.
